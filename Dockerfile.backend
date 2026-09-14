@@ -1,0 +1,19 @@
+FROM golang:1.23-bookworm AS builder
+WORKDIR /app
+COPY server/ ./
+# 配置国内 Go 模块代理（关键）
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GIN_MODE=release
+RUN go mod tidy
+RUN CGO_ENABLED=1 go build -o kpi-server main.go
+
+FROM debian:bookworm-slim
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/kpi-server /app/kpi-server
+RUN mkdir -p /app/db /app/exports
+ENV GIN_MODE=release
+ENV SYSTEM_MODE=standalone
+EXPOSE 8080
+CMD ["/app/kpi-server"]

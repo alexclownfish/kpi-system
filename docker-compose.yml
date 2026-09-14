@@ -1,0 +1,33 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: kpi-backend
+    restart: unless-stopped
+    volumes:
+      - kpi-db:/app/db
+      - kpi-exports:/app/exports
+    environment:
+      - SYSTEM_MODE=standalone
+      - GIN_MODE=release
+      - JWT_SECRET=${JWT_SECRET:-please-change-this-secret-in-production}
+    ports:
+      - "13808:8080"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: kpi-frontend
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+    ports:
+      - "13003:3000"
+    depends_on:
+      - backend
+
+volumes:
+  kpi-db:
+  kpi-exports:

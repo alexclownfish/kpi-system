@@ -1,0 +1,9 @@
+services:
+  kpi:
+    image: "dootask/kpi:${PLUGIN_VERSION}"
+    volumes:
+      - kpi_data:/web/db
+    restart: unless-stopped
+
+volumes:
+  kpi_data:

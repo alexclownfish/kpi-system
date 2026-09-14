@@ -1,0 +1,24 @@
+menu_items:
+  - location: application
+    label:
+      en: KPI
+      zh: 绩效考核
+    url: "apps/kpi?theme={system_theme}"
+    type: iframe
+    immersive: true
+require_version:
+  version: "> 1.4.67"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
+hooks:
+  user_onboard: |
+    # 用户创建/入职时触发
+    curl -sS -X POST "http://kpi:8080/api/hooks/user/onboard" \
+      -H "Content-Type: application/json" \
+      -d "{\"user_id\": ${USER_ID:-0}, \"email\": \"${USER_EMAIL:-}\"}"
+  user_offboard: |
+    # 用户离职/删除时触发
+    curl -sS -X POST "http://kpi:8080/api/hooks/user/offboard" \
+      -H "Content-Type: application/json" \
+      -d "{\"user_id\": ${USER_ID:-0}, \"email\": \"${USER_EMAIL:-}\"}"
