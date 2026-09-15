@@ -3,10 +3,12 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"dootask-kpi-server/models"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 )
 
 // 获取所有员工
@@ -180,6 +182,19 @@ func GetEmployee(c *gin.Context) {
 	})
 }
 
+// 更新员工请求
+// Password 只用于编辑员工时重置密码，不会在响应中返回。
+type UpdateEmployeeRequest struct {
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	Position     string `json:"position"`
+	DepartmentID uint   `json:"department_id"`
+	ManagerID    *uint  `json:"manager_id"`
+	Role         string `json:"role"`
+	IsActive     bool   `json:"is_active"`
+}
+
 // 更新员工
 func UpdateEmployee(c *gin.Context) {
 	id := c.Param("id")
@@ -200,7 +215,7 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 
-	var updateData models.Employee
+	var updateData UpdateEmployeeRequest
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
@@ -225,6 +240,22 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 
+	// 密码重置属于 HR 管理操作，避免主管通过接口修改员工登录凭据。
+	if updateData.Password != "" {
+		if c.GetString("user_role") != "hr" {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "只有HR可以修改员工密码",
+			})
+			return
+		}
+		if strings.TrimSpace(updateData.Password) == "" || len(updateData.Password) < 6 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "密码长度不能少于6位",
+			})
+			return
+		}
+	}
+
 	roleValue := updateData.Role
 	if roleValue == "" {
 		roleValue = employee.Role
@@ -243,6 +274,18 @@ func UpdateEmployee(c *gin.Context) {
 		"manager_id":    managerValue, // 支持 nil 值以清空直属上级
 		"role":          roleValue,
 		"is_active":     updateData.IsActive,
+	}
+
+	if updateData.Password != "" {
+		hashedPassword, hashErr := bcrypt.GenerateFromPassword([]byte(updateData.Password), bcrypt.DefaultCost)
+		if hashErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":   "密码加密失败",
+				"message": hashErr.Error(),
+			})
+			return
+		}
+		updateMap["password"] = string(hashedPassword)
 	}
 
 	result = models.DB.Model(&employee).Updates(updateMap)

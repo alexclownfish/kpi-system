@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Users, Search } from "lucide-react"
-import { employeeApi, departmentApi, type Employee, type Department, type PaginatedResponse } from "@/lib/api"
+import { employeeApi, departmentApi, type Employee, type EmployeeUpdateRequest, type Department, type PaginatedResponse } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { useAuth } from "@/lib/auth-context"
 import { Pagination, usePagination } from "@/components/pagination"
@@ -36,6 +36,8 @@ export default function EmployeesPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
+    confirmPassword: "",
     position: "",
     department_id: "",
     manager_id: "",
@@ -162,6 +164,16 @@ export default function EmployeesPage() {
         return
       }
 
+      if (editingEmployee && formData.password !== "" && formData.password.length < 6) {
+        await Alert("验证失败", "密码长度不能少于6位。")
+        return
+      }
+
+      if (editingEmployee && formData.password !== formData.confirmPassword) {
+        await Alert("验证失败", "两次输入的密码不一致。")
+        return
+      }
+
       // 构建提交数据，先处理基本字段
       const baseData = {
         name: formData.name,
@@ -173,19 +185,18 @@ export default function EmployeesPage() {
       }
       
       // 处理 manager_id：如果为空字符串，在更新时明确设置为 null，创建时设为 undefined
-      const submitData: Omit<Employee, "id" | "created_at" | "manager_id"> & {
-        manager_id?: number | null
-      } = {
+      const submitData = {
         ...baseData,
         manager_id: formData.manager_id
           ? parseInt(formData.manager_id)
           : editingEmployee
             ? null
             : undefined,
+        ...(editingEmployee && formData.password ? { password: formData.password } : {}),
       }
 
       if (editingEmployee) {
-        await employeeApi.update(editingEmployee.id, submitData as Partial<Employee>)
+        await employeeApi.update(editingEmployee.id, submitData as EmployeeUpdateRequest)
       } else {
         await employeeApi.create(submitData as Omit<Employee, "id" | "created_at">)
       }
@@ -193,7 +204,7 @@ export default function EmployeesPage() {
       fetchEmployees()
       setDialogOpen(false)
       setEditingEmployee(null)
-      setFormData({ name: "", email: "", position: "", department_id: "", manager_id: "", role: "employee", is_active: true })
+      setFormData({ name: "", email: "", password: "", confirmPassword: "", position: "", department_id: "", manager_id: "", role: "employee", is_active: true })
     } catch (error) {
       console.error("保存员工失败:", error)
     }
@@ -218,6 +229,8 @@ export default function EmployeesPage() {
     setFormData({
       name: employee.name,
       email: employee.email,
+      password: "",
+      confirmPassword: "",
       position: employee.position,
       department_id: employee.department_id.toString(),
       manager_id: employee.manager_id?.toString() || "",
@@ -230,7 +243,7 @@ export default function EmployeesPage() {
   // 打开新增对话框
   const handleAdd = () => {
     setEditingEmployee(null)
-    setFormData({ name: "", email: "", position: "", department_id: "", manager_id: "", role: "employee", is_active: true })
+    setFormData({ name: "", email: "", password: "", confirmPassword: "", position: "", department_id: "", manager_id: "", role: "employee", is_active: true })
     setDialogOpen(true)
   }
 
@@ -305,6 +318,34 @@ export default function EmployeesPage() {
                     required
                   />
                 </div>
+                {isHR && editingEmployee && (
+                  <>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="password">新密码</Label>
+                      <Input
+                        id="password"
+                        type="password"
+                        autoComplete="new-password"
+                        value={formData.password}
+                        onChange={e => setFormData({ ...formData, password: e.target.value })}
+                        placeholder="留空表示不修改"
+                        minLength={6}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="confirm-password">确认新密码</Label>
+                      <Input
+                        id="confirm-password"
+                        type="password"
+                        autoComplete="new-password"
+                        value={formData.confirmPassword}
+                        onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
+                        placeholder="再次输入新密码"
+                        minLength={6}
+                      />
+                    </div>
+                  </>
+                )}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="department">部门</Label>
                   <Select

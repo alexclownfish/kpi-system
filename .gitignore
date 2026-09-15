@@ -43,3 +43,6 @@ next-env.d.ts
 # local extraction artifacts
 /kpi-main/
 /kpi-main.zip
+
+# nginx runtime logs
+/nginx/logs/

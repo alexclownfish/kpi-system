@@ -70,6 +70,11 @@ export interface Employee {
   manager?: { name: string }
 }
 
+export type EmployeeUpdateRequest = Omit<Partial<Employee>, "manager_id"> & {
+  manager_id?: number | null
+  password?: string
+}
+
 export interface KPITemplate {
   id: number
   name: string
@@ -369,7 +374,7 @@ export const employeeApi = {
   getAll: (params?: PaginationParams): Promise<PaginatedResponse<Employee>> => api.get("/employees", { params }),
   getById: (id: number): Promise<{ data: Employee }> => api.get(`/employees/${id}`),
   create: (data: Omit<Employee, "id" | "created_at">): Promise<{ data: Employee }> => api.post("/employees", data),
-  update: (id: number, data: Partial<Employee>): Promise<{ data: Employee }> => api.put(`/employees/${id}`, data),
+  update: (id: number, data: EmployeeUpdateRequest): Promise<{ data: Employee }> => api.put(`/employees/${id}`, data),
   delete: (id: number): Promise<void> => api.delete(`/employees/${id}`),
   getSubordinates: (id: number): Promise<{ data: Employee[]; total: number }> =>
     api.get(`/employees/${id}/subordinates`),

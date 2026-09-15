@@ -1241,6 +1241,7 @@ components:
       properties:
         name: { type: string }
         email: { type: string, format: email }
+        password: { type: string, minLength: 6, description: 仅编辑员工时填写，留空表示不修改 }
         position: { type: string }
         department_id: { type: integer }
         manager_id: { type: integer, nullable: true }
