@@ -17,6 +17,7 @@ import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getRoleLabel, normalizeRoleCode, roleRequiresManager } from "@/lib/access-control"
+import axios from "axios"
 
 export default function EmployeesPage() {
   const { Alert, Confirm } = useAppContext()
@@ -32,6 +33,7 @@ export default function EmployeesPage() {
   const [supervisors, setSupervisors] = useState<Employee[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
@@ -198,6 +200,8 @@ export default function EmployeesPage() {
         return
       }
 
+      setSubmitting(true)
+
       // 构建提交数据，先处理基本字段
       const baseData = {
         name: formData.name,
@@ -222,15 +226,24 @@ export default function EmployeesPage() {
       if (editingEmployee) {
         await employeeApi.update(editingEmployee.id, submitData as EmployeeUpdateRequest)
       } else {
-        await employeeApi.create({ ...submitData, role: formData.role } as Omit<Employee, "id" | "created_at">)
+        await employeeApi.create({ ...submitData, role: formData.role, password: formData.password })
       }
 
-      fetchEmployees()
+      await fetchEmployees()
       setDialogOpen(false)
       setEditingEmployee(null)
       setFormData({ name: "", email: "", password: "", confirmPassword: "", position: "", department_id: "", manager_id: "", role: "employee", is_active: true })
+      await Alert(editingEmployee ? "更新成功" : "创建成功", editingEmployee ? "员工信息已更新。" : "新员工已创建，可使用初始密码登录。")
     } catch (error) {
       console.error("保存员工失败:", error)
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.response?.data?.message || error.message
+        : error instanceof Error
+          ? error.message
+          : "未知错误"
+      await Alert("保存失败", message)
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -476,8 +489,8 @@ export default function EmployeesPage() {
               >
                 取消
               </Button>
-              <Button type="submit" form="employee-form" className="w-full sm:w-auto">
-                {editingEmployee ? "更新" : "创建"}
+              <Button type="submit" form="employee-form" className="w-full sm:w-auto" disabled={submitting}>
+                {submitting ? "提交中..." : editingEmployee ? "更新" : "创建"}
               </Button>
             </DialogFooter>
           </DialogContent>

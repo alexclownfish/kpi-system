@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func setupPermissionDB(t *testing.T) {
@@ -43,6 +44,44 @@ func TestReplaceUserRoleRemovesPreviousRole(t *testing.T) {
 	models.DB.Where("user_id = ?", user.ID).Find(&assignments)
 	if len(assignments) != 1 || assignments[0].RoleID != managerRole.ID {
 		t.Fatalf("unexpected role assignments: %+v", assignments)
+	}
+}
+
+func TestCreateEmployeeAcceptsAndHashesInitialPassword(t *testing.T) {
+	setupPermissionDB(t)
+	gin.SetMode(gin.TestMode)
+	department := models.Department{Name: "运维部"}
+	role := models.Role{Code: "department_manager", Name: "部门负责人"}
+	models.DB.Create(&department)
+	models.DB.Create(&role)
+
+	r := gin.New()
+	r.POST("/employees", func(c *gin.Context) {
+		c.Set("user_id", uint(1))
+		c.Next()
+	}, CreateEmployee)
+	body := fmt.Sprintf(`{"name":"新员工","email":"new-employee@test","password":"12345678","position":"运维","department_id":%d,"role":"department_manager","is_active":true}`, department.ID)
+	req := httptest.NewRequest(http.MethodPost, "/employees", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	r.ServeHTTP(response, req)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status=%d body=%s, want 201", response.Code, response.Body.String())
+	}
+
+	var employee models.Employee
+	if err := models.DB.Where("email = ?", "new-employee@test").First(&employee).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(employee.Password), []byte("12345678")); err != nil {
+		t.Fatalf("stored password is not the submitted bcrypt hash: %v", err)
+	}
+	if employee.Role != "manager" {
+		t.Fatalf("legacy employee role=%q, want manager", employee.Role)
+	}
+	var assignment models.UserRole
+	if err := models.DB.Where("user_id = ? AND role_id = ?", employee.ID, role.ID).First(&assignment).Error; err != nil {
+		t.Fatalf("role assignment was not created: %v", err)
 	}
 }
 

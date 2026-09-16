@@ -70,6 +70,12 @@ export interface Employee {
   manager?: { name: string }
 }
 
+export type CreateEmployeeRequest = Omit<Employee, "id" | "created_at" | "manager_id"> & {
+  manager_id?: number | null
+  // 兼容历史调用点；当前员工页面会在提交前校验并始终传入。
+  password?: string
+}
+
 export interface Permission {
   id: number
   code: string
@@ -395,7 +401,7 @@ export interface EvaluationPaginationParams extends PaginationParams {
 export const employeeApi = {
   getAll: (params?: PaginationParams): Promise<PaginatedResponse<Employee>> => api.get("/employees", { params }),
   getById: (id: number): Promise<{ data: Employee }> => api.get(`/employees/${id}`),
-  create: (data: Omit<Employee, "id" | "created_at">): Promise<{ data: Employee }> => api.post("/employees", data),
+  create: (data: CreateEmployeeRequest): Promise<{ data: Employee; message: string }> => api.post("/employees", data),
   update: (id: number, data: EmployeeUpdateRequest): Promise<{ data: Employee }> => api.put(`/employees/${id}`, data),
   delete: (id: number): Promise<void> => api.delete(`/employees/${id}`),
   assignRole: (id: number, roleCode: string): Promise<{ message: string; role: Role }> =>

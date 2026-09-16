@@ -119,16 +119,39 @@ func GetEmployees(c *gin.Context) {
 	})
 }
 
+// CreateEmployeeRequest 单独承接创建参数，避免 Employee.Password 的 json:"-"
+// 在解码请求时丢弃初始密码。
+type CreateEmployeeRequest struct {
+	Name         string `json:"name"`
+	Email        string `json:"email"`
+	Password     string `json:"password"`
+	Position     string `json:"position"`
+	DepartmentID uint   `json:"department_id"`
+	ManagerID    *uint  `json:"manager_id"`
+	Role         string `json:"role"`
+	IsActive     bool   `json:"is_active"`
+}
+
 // 创建员工
 func CreateEmployee(c *gin.Context) {
-	var employee models.Employee
+	var request CreateEmployeeRequest
 
-	if err := c.ShouldBindJSON(&employee); err != nil {
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
 		return
+	}
+	employee := models.Employee{
+		Name:         strings.TrimSpace(request.Name),
+		Email:        strings.TrimSpace(request.Email),
+		Password:     request.Password,
+		Position:     strings.TrimSpace(request.Position),
+		DepartmentID: request.DepartmentID,
+		ManagerID:    request.ManagerID,
+		Role:         request.Role,
+		IsActive:     request.IsActive,
 	}
 
 	if employee.Role == "" {
