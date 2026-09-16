@@ -7,6 +7,7 @@ import Loading from "./loading"
 import { useDootaskContext } from "@/lib/dootask-context"
 import { AlertCircle } from "lucide-react"
 import { Button } from "./ui/button"
+import { getDefaultLandingPath } from "@/lib/access-control"
 
 interface ProtectedRouteProps {
   children: React.ReactNode
@@ -19,7 +20,7 @@ export default function ProtectedRoute({
   requireAuth = true,
   redirectTo = "/auth/login",
 }: ProtectedRouteProps) {
-  const { user, loading, isHR, logout } = useAuth()
+  const { user, loading, logout } = useAuth()
   const { loading: dooTaskLoading, error: dooTaskError } = useDootaskContext()
   const router = useRouter()
   const pathname = usePathname()
@@ -46,10 +47,10 @@ export default function ProtectedRoute({
 
     // 如果不需要认证且用户已登录，且当前在认证页面，重定向到首页
     if (!requireAuth && user && pathname.startsWith("/auth")) {
-      router.push(isHR ? "/" : "/evaluations")
+      router.push(getDefaultLandingPath(user.permissions))
       return
     }
-  }, [user, loading, requireAuth, router, redirectTo, pathname, isHR])
+  }, [user, loading, requireAuth, router, redirectTo, pathname])
 
   // 显示加载状态
   if (loading || dooTaskLoading) {

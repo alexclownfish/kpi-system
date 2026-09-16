@@ -10,20 +10,27 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Users, Search } from "lucide-react"
-import { employeeApi, departmentApi, type Employee, type EmployeeUpdateRequest, type Department, type PaginatedResponse } from "@/lib/api"
+import { accessControlApi, employeeApi, departmentApi, type Employee, type EmployeeUpdateRequest, type Department, type PaginatedResponse, type Role } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { useAuth } from "@/lib/auth-context"
 import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { getRoleLabel, normalizeRoleCode, roleRequiresManager } from "@/lib/access-control"
 
 export default function EmployeesPage() {
   const { Alert, Confirm } = useAppContext()
-  const { isHR } = useAuth()
+  const { hasPermission } = useAuth()
+  const canCreate = hasPermission("employee:create")
+  const canEdit = hasPermission("employee:edit")
+  const canDelete = hasPermission("employee:delete")
+  const canAssignRole = hasPermission("employee:assign_role")
+  const canManageSystemRoles = hasPermission("role:edit")
   const [employees, setEmployees] = useState<Employee[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [managers, setManagers] = useState<Employee[]>([])
   const [supervisors, setSupervisors] = useState<Employee[]>([])
+  const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
@@ -66,22 +73,29 @@ export default function EmployeesPage() {
   }, [currentPage, pageSize, searchQuery])
 
   // 获取部门列表
-  const fetchDepartments = async () => {
+  const fetchDepartments = useCallback(async () => {
     try {
       const response = await departmentApi.getAll()
       setDepartments(response.data || [])
     } catch (error) {
       console.error("获取部门列表失败:", error)
     }
-  }
+  }, [])
 
   useEffect(() => {
     fetchEmployees()
   }, [fetchEmployees])
 
   useEffect(() => {
-    fetchDepartments()
-  }, [])
+    if (canCreate || canEdit) fetchDepartments()
+  }, [canCreate, canEdit, fetchDepartments])
+
+  useEffect(() => {
+    if (!canAssignRole) return
+    accessControlApi.getRoles()
+      .then(response => setRoles(response.data || []))
+      .catch(error => console.error("获取角色列表失败:", error))
+  }, [canAssignRole])
 
   // 搜索处理函数
   const handleSearch = useCallback(
@@ -136,20 +150,20 @@ export default function EmployeesPage() {
   }, [])
 
   useEffect(() => {
-    if ((formData.role === "manager" || formData.role === "hr") && supervisors.length === 0) {
+    if (!roleRequiresManager(formData.role) && supervisors.length === 0) {
       fetchSupervisors()
     }
   }, [formData.role, supervisors.length, fetchSupervisors])
 
   const supervisorOptions = useMemo(() => {
-    if (formData.role === "manager" || formData.role === "hr") {
+    if (!roleRequiresManager(formData.role)) {
       return supervisors.filter(emp => (editingEmployee ? emp.id !== editingEmployee.id : true))
     }
     return managers
   }, [formData.role, supervisors, managers, editingEmployee])
 
   const managerSelectValue = useMemo(() => {
-    if (formData.role === "manager" || formData.role === "hr") {
+    if (!roleRequiresManager(formData.role)) {
       return formData.manager_id || "none"
     }
     return formData.manager_id
@@ -159,8 +173,18 @@ export default function EmployeesPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     try {
-      if (formData.role === "employee" && !formData.manager_id) {
+      if (!formData.department_id) {
+        await Alert("验证失败", "请选择员工所属部门。")
+        return
+      }
+
+      if (roleRequiresManager(formData.role) && !formData.manager_id) {
         await Alert("验证失败", "普通员工必须选择直属上级，请先选择上级后再提交。")
+        return
+      }
+
+      if (!editingEmployee && formData.password.length < 6) {
+        await Alert("验证失败", "初始密码长度不能少于6位。")
         return
       }
 
@@ -169,7 +193,7 @@ export default function EmployeesPage() {
         return
       }
 
-      if (editingEmployee && formData.password !== formData.confirmPassword) {
+      if (formData.password !== formData.confirmPassword) {
         await Alert("验证失败", "两次输入的密码不一致。")
         return
       }
@@ -180,25 +204,25 @@ export default function EmployeesPage() {
         email: formData.email,
         position: formData.position,
         department_id: parseInt(formData.department_id),
-        role: formData.role,
         is_active: formData.is_active,
       }
       
       // 处理 manager_id：如果为空字符串，在更新时明确设置为 null，创建时设为 undefined
       const submitData = {
         ...baseData,
+        ...(canAssignRole ? { role: formData.role } : {}),
         manager_id: formData.manager_id
           ? parseInt(formData.manager_id)
           : editingEmployee
             ? null
             : undefined,
-        ...(editingEmployee && formData.password ? { password: formData.password } : {}),
+        ...(formData.password ? { password: formData.password } : {}),
       }
 
       if (editingEmployee) {
         await employeeApi.update(editingEmployee.id, submitData as EmployeeUpdateRequest)
       } else {
-        await employeeApi.create(submitData as Omit<Employee, "id" | "created_at">)
+        await employeeApi.create({ ...submitData, role: formData.role } as Omit<Employee, "id" | "created_at">)
       }
 
       fetchEmployees()
@@ -234,7 +258,7 @@ export default function EmployeesPage() {
       position: employee.position,
       department_id: employee.department_id.toString(),
       manager_id: employee.manager_id?.toString() || "",
-      role: employee.role,
+      role: normalizeRoleCode(employee.role),
       is_active: employee.is_active,
     })
     setDialogOpen(true)
@@ -247,27 +271,13 @@ export default function EmployeesPage() {
     setDialogOpen(true)
   }
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case "hr":
-        return "HR"
-      case "manager":
-        return "主管"
-      default:
-        return "员工"
-    }
+  const getRoleBadge = (role: string) => {
+    const code = normalizeRoleCode(role)
+    const variant = code === "super_admin" ? "destructive" : code === "employee" ? "outline" : "secondary"
+    return <Badge variant={variant}>{getRoleLabel(code)}</Badge>
   }
 
-  const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "hr":
-        return <Badge variant="destructive">HR</Badge>
-      case "manager":
-        return <Badge variant="default">主管</Badge>
-      default:
-        return <Badge variant="outline">员工</Badge>
-    }
-  }
+  const assignableRoles = roles.filter(role => role.code !== "super_admin" || canManageSystemRoles)
 
   return (
     <div className="space-y-6">
@@ -277,13 +287,13 @@ export default function EmployeesPage() {
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground">员工管理</h1>
           <p className="text-muted-foreground mt-1 sm:mt-2">管理员工信息和组织架构</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={handleAdd} className="w-full sm:w-auto lg:mt-8">
+        {(canCreate || canEdit) && <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          {canCreate && <DialogTrigger asChild>
+            <Button onClick={handleAdd} className="w-full sm:w-auto lg:mt-8" disabled={!canCreate}>
               <Plus className="w-4 h-4 mr-2" />
               添加员工
             </Button>
-          </DialogTrigger>
+          </DialogTrigger>}
           <DialogContent className="w-[95vw] sm:max-w-md mx-auto">
             <DialogHeader>
               <DialogTitle>{editingEmployee ? "编辑员工" : "添加员工"}</DialogTitle>
@@ -318,30 +328,32 @@ export default function EmployeesPage() {
                     required
                   />
                 </div>
-                {isHR && editingEmployee && (
+                {(!editingEmployee || canEdit) && (
                   <>
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="password">新密码</Label>
+                      <Label htmlFor="password">{editingEmployee ? "新密码" : "初始密码"}</Label>
                       <Input
                         id="password"
                         type="password"
                         autoComplete="new-password"
                         value={formData.password}
                         onChange={e => setFormData({ ...formData, password: e.target.value })}
-                        placeholder="留空表示不修改"
+                        placeholder={editingEmployee ? "留空表示不修改" : "至少 6 位"}
                         minLength={6}
+                        required={!editingEmployee}
                       />
                     </div>
                     <div className="flex flex-col gap-2">
-                      <Label htmlFor="confirm-password">确认新密码</Label>
+                      <Label htmlFor="confirm-password">{editingEmployee ? "确认新密码" : "确认初始密码"}</Label>
                       <Input
                         id="confirm-password"
                         type="password"
                         autoComplete="new-password"
                         value={formData.confirmPassword}
                         onChange={e => setFormData({ ...formData, confirmPassword: e.target.value })}
-                        placeholder="再次输入新密码"
+                        placeholder={editingEmployee ? "再次输入新密码" : "再次输入初始密码"}
                         minLength={6}
+                        required={!editingEmployee}
                       />
                     </div>
                   </>
@@ -364,7 +376,7 @@ export default function EmployeesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="flex flex-col gap-2">
+                {canAssignRole && <div className="flex flex-col gap-2">
                   <Label htmlFor="role">角色</Label>
                   <Select
                     value={formData.role}
@@ -372,8 +384,6 @@ export default function EmployeesPage() {
                       setFormData(prev => ({
                         ...prev,
                         role: value,
-                        // 只有从非可选角色切换到必选角色时才清空manager_id
-                        manager_id: value === "employee" && !prev.manager_id ? prev.manager_id : prev.manager_id,
                       }))
                     }
                   >
@@ -381,20 +391,18 @@ export default function EmployeesPage() {
                       <SelectValue placeholder="选择角色" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="employee">员工</SelectItem>
-                      <SelectItem value="manager">主管</SelectItem>
-                      <SelectItem value="hr">HR</SelectItem>
+                      {assignableRoles.map(role => (
+                        <SelectItem key={role.code} value={role.code}>{role.name}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </div>}
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="manager">
                     直属上级
-                    {formData.role === "employee"
+                    {roleRequiresManager(formData.role)
                       ? "（必选）"
-                      : formData.role === "hr"
-                        ? "（可选，可指定任一员工或无上级）"
-                        : "（可选，可指定任一员工或无上级）"}
+                      : "（可选，可指定任一员工或无上级）"}
                   </Label>
                   <Select
                     value={managerSelectValue}
@@ -403,21 +411,21 @@ export default function EmployeesPage() {
                     <SelectTrigger>
                       <SelectValue
                         placeholder={
-                          formData.role === "employee"
+                          roleRequiresManager(formData.role)
                             ? "选择直属上级（必选）"
                             : "选择任一员工作为上级或无上级"
                         }
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {(formData.role === "manager" || formData.role === "hr") && (
+                      {!roleRequiresManager(formData.role) && (
                         <SelectItem value="none">
                           无上级
                         </SelectItem>
                       )}
                       {supervisorOptions.length === 0 && (
                         <SelectItem value="none-disabled" disabled>
-                          {formData.role === "employee" ? "暂无可选上级" : "暂无可选员工"}
+                          {roleRequiresManager(formData.role) ? "暂无可选上级" : "暂无可选员工"}
                         </SelectItem>
                       )}
                       {supervisorOptions.map(manager => {
@@ -434,7 +442,7 @@ export default function EmployeesPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {isHR && editingEmployee && (
+                {canEdit && editingEmployee && (
                   <div className="flex flex-col gap-2">
                     <Label>状态</Label>
                     <RadioGroup
@@ -473,7 +481,7 @@ export default function EmployeesPage() {
               </Button>
             </DialogFooter>
           </DialogContent>
-        </Dialog>
+        </Dialog>}
       </div>
 
       <Card>
@@ -504,6 +512,7 @@ export default function EmployeesPage() {
               {searchQuery ? "未找到匹配的员工" : "暂无员工数据"}
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -514,7 +523,7 @@ export default function EmployeesPage() {
                   <TableHead>直属上级</TableHead>
                   <TableHead>角色</TableHead>
                   <TableHead>状态</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
+                  {(canEdit || canDelete) && <TableHead className="text-right">操作</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -531,18 +540,19 @@ export default function EmployeesPage() {
                         {employee.is_active ? "在职" : "离职"}
                       </Badge>
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" onClick={() => handleEdit(employee)}>
+                    {(canEdit || canDelete) && <TableCell className="text-right space-x-2 whitespace-nowrap">
+                      {canEdit && <Button variant="outline" size="sm" onClick={() => handleEdit(employee)} aria-label={`编辑 ${employee.name}`} title="编辑员工">
                         <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(employee.id)}>
+                      </Button>}
+                      {canDelete && <Button variant="outline" size="sm" onClick={() => handleDelete(employee.id)} aria-label={`删除 ${employee.name}`} title="删除员工">
                         <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TableCell>
+                      </Button>}
+                    </TableCell>}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            </div>
           )}
 
           {/* 分页组件 */}

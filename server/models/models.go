@@ -4,6 +4,67 @@ import (
 	"time"
 )
 
+// Role represents a business role. Code is stable and used by permission checks.
+type Role struct {
+	ID          uint         `json:"id" gorm:"primaryKey"`
+	Code        string       `json:"code" gorm:"uniqueIndex;not null"`
+	Name        string       `json:"name" gorm:"not null"`
+	Description string       `json:"description"`
+	IsSystem    bool         `json:"is_system" gorm:"default:true"`
+	CreatedAt   time.Time    `json:"created_at"`
+	UpdatedAt   time.Time    `json:"updated_at"`
+	Permissions []Permission `json:"permissions,omitempty" gorm:"many2many:role_permissions"`
+}
+
+// Permission is a resource/action capability, for example employee:view.
+type Permission struct {
+	ID          uint      `json:"id" gorm:"primaryKey"`
+	Code        string    `json:"code" gorm:"uniqueIndex;not null"`
+	Name        string    `json:"name" gorm:"not null"`
+	Resource    string    `json:"resource" gorm:"not null"`
+	Action      string    `json:"action" gorm:"not null"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
+}
+
+type UserRole struct {
+	UserID    uint      `json:"user_id" gorm:"primaryKey"`
+	RoleID    uint      `json:"role_id" gorm:"primaryKey"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+type RolePermission struct {
+	RoleID       uint      `json:"role_id" gorm:"primaryKey"`
+	PermissionID uint      `json:"permission_id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+type DataScope struct {
+	ID          uint   `json:"id" gorm:"primaryKey"`
+	Code        string `json:"code" gorm:"uniqueIndex;not null"`
+	Name        string `json:"name" gorm:"not null"`
+	Description string `json:"description"`
+}
+
+type RoleDataScope struct {
+	RoleID      uint      `json:"role_id" gorm:"primaryKey"`
+	DataScopeID uint      `json:"data_scope_id" gorm:"primaryKey"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+type AuditLog struct {
+	ID         uint      `json:"id" gorm:"primaryKey"`
+	UserID     uint      `json:"user_id" gorm:"index"`
+	Action     string    `json:"action" gorm:"not null"`
+	Resource   string    `json:"resource" gorm:"not null"`
+	ResourceID string    `json:"resource_id"`
+	IPAddress  string    `json:"ip_address"`
+	Result     string    `json:"result" gorm:"not null"`
+	Details    string    `json:"details"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
 // 部门模型
 type Department struct {
 	ID          uint      `json:"id" gorm:"primaryKey"`

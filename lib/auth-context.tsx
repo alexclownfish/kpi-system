@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { authApi, LoginRequest, RegisterRequest, type AuthUser } from "@/lib/api"
 import { useDootaskContext } from "./dootask-context"
+import { normalizeRoleCode } from "./access-control"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -18,6 +19,7 @@ interface AuthContextType {
   isHR: boolean
   isManager: boolean
   isEmployee: boolean
+  hasPermission: (permission: string) => boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -44,8 +46,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // 验证token是否仍然有效
           try {
             const response = await authApi.getCurrentUser()
-            setUser(response.data)
-            authApi.setAuth(token, response.data)
+            const currentUser = { ...response.data, permissions: response.permissions, data_scope: response.data_scope }
+            setUser(currentUser)
+            authApi.setAuth(token, currentUser)
           } catch {
             // Token无效，清除本地存储
             authApi.logout()
@@ -71,8 +74,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (data: LoginRequest) => {
     try {
       const response = await authApi.login(data)
-      authApi.setAuth(response.token, response.user)
-      setUser(response.user)
+      const loggedInUser = { ...response.user, permissions: response.permissions, data_scope: response.data_scope }
+      authApi.setAuth(response.token, loggedInUser)
+      setUser(loggedInUser)
     } catch (error) {
       throw error
     }
@@ -87,8 +91,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }) => {
     try {
       const response = await authApi.register(data)
-      authApi.setAuth(response.token, response.user)
-      setUser(response.user)
+      const registeredUser = { ...response.user, permissions: response.permissions, data_scope: response.data_scope }
+      authApi.setAuth(response.token, registeredUser)
+      setUser(registeredUser)
     } catch (error) {
       throw error
     }
@@ -102,10 +107,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const refreshUser = async () => {
     try {
       const response = await authApi.getCurrentUser()
-      setUser(response.data)
+      const currentUser = { ...response.data, permissions: response.permissions, data_scope: response.data_scope }
+      setUser(currentUser)
       const token = authApi.getToken()
       if (token) {
-        authApi.setAuth(token, response.data)
+        authApi.setAuth(token, currentUser)
       }
     } catch (error) {
       console.error("刷新用户信息失败:", error)
@@ -124,9 +130,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser,
 
     // 角色判断
-    isHR: user?.role === "hr",
-    isManager: user?.role === "manager",
-    isEmployee: user?.role === "employee",
+    isHR: normalizeRoleCode(user?.role || "") === "hr_admin",
+    isManager: normalizeRoleCode(user?.role || "") === "department_manager",
+    isEmployee: normalizeRoleCode(user?.role || "") === "employee",
+    hasPermission: (permission: string) => !!user?.permissions?.includes(permission),
   }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

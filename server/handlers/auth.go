@@ -47,8 +47,10 @@ type RegisterRequest struct {
 
 // 登录响应结构
 type LoginResponse struct {
-	Token string           `json:"token"`
-	User  *models.Employee `json:"user"`
+	Token       string           `json:"token"`
+	User        *models.Employee `json:"user"`
+	Permissions []string         `json:"permissions,omitempty"`
+	DataScope   string           `json:"data_scope,omitempty"`
 }
 
 // 生成JWT token
@@ -148,6 +150,10 @@ func Register(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户创建失败"})
 		return
 	}
+	if err := AssignDefaultRole(user.ID, user.Role); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "用户角色初始化失败"})
+		return
+	}
 
 	// 预加载关联数据
 	if err := models.DB.Preload("Department").First(&user, user.ID).Error; err != nil {
@@ -162,10 +168,7 @@ func Register(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, LoginResponse{
-		Token: token,
-		User:  &user,
-	})
+	c.JSON(http.StatusCreated, LoginResponse{Token: token, User: &user, Permissions: UserPermissions(user.ID), DataScope: DataScopeForUser(user.ID)})
 }
 
 // Login 用户登录
@@ -202,10 +205,7 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
-		Token: token,
-		User:  &user,
-	})
+	c.JSON(http.StatusOK, LoginResponse{Token: token, User: &user, Permissions: UserPermissions(user.ID), DataScope: DataScopeForUser(user.ID)})
 }
 
 // LoginByDooTaskToken 用户登录（DooTaskToken）
@@ -276,6 +276,10 @@ func LoginByDooTaskToken(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "用户创建失败"})
 			return
 		}
+		if err := AssignDefaultRole(user.ID, user.Role); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "用户角色初始化失败"})
+			return
+		}
 	} else {
 		// 更新用户信息
 		user.Name = dooTaskUser.Nickname
@@ -297,10 +301,7 @@ func LoginByDooTaskToken(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, LoginResponse{
-		Token: token,
-		User:  &user,
-	})
+	c.JSON(http.StatusOK, LoginResponse{Token: token, User: &user, Permissions: UserPermissions(user.ID), DataScope: DataScopeForUser(user.ID)})
 }
 
 // GetCurrentUser 获取当前用户信息
@@ -318,7 +319,7 @@ func GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": user})
+	c.JSON(http.StatusOK, gin.H{"data": user, "permissions": UserPermissions(user.ID), "data_scope": DataScopeForUser(user.ID)})
 }
 
 // RefreshToken 刷新token
@@ -407,6 +408,12 @@ func AuthMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
+		// Backfill the RBAC join row for users created before the MVP migration.
+		if err := AssignDefaultRole(user.ID, user.Role); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "用户角色初始化失败"})
+			c.Abort()
+			return
+		}
 
 		// 将用户信息存储在context中
 		c.Set("user_id", claims.UserID)
@@ -414,31 +421,5 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("user_role", claims.Role)
 		c.Set("user_name", user.Name)
 		c.Next()
-	}
-}
-
-// RoleMiddleware 角色权限中间件
-func RoleMiddleware(allowedRoles ...string) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// 先执行认证中间件
-		AuthMiddleware()(c)
-
-		userRole, exists := c.Get("user_role")
-		if !exists {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "用户未登录"})
-			c.Abort()
-			return
-		}
-
-		role := userRole.(string)
-		for _, allowedRole := range allowedRoles {
-			if role == allowedRole {
-				c.Next()
-				return
-			}
-		}
-
-		c.JSON(http.StatusForbidden, gin.H{"error": "权限不足"})
-		c.Abort()
 	}
 }

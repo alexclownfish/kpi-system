@@ -18,6 +18,7 @@ import {
   Database,
   Scale,
 } from "lucide-react"
+import type { LucideIcon } from "lucide-react"
 import { useEffect, useMemo } from "react"
 import { useAuth } from "@/lib/auth-context"
 import { Button } from "./ui/button"
@@ -25,121 +26,92 @@ import { useRouter } from "next/navigation"
 import { Badge } from "./ui/badge"
 import { useDootaskContext } from "@/lib/dootask-context"
 import { useUnreadContext } from "@/lib/unread-context"
+import { getDefaultLandingPath, getRoleLabel, normalizeRoleCode } from "@/lib/access-control"
 
 interface SidebarProps {
   isMobileMenuOpen: boolean
   setIsMobileMenuOpen: (open: boolean) => void
 }
 
+interface NavigationItem {
+  name: string
+  href: string
+  icon: LucideIcon
+  permission?: string
+  badge?: number
+  hidden?: boolean
+}
+
+interface NavigationSection {
+  category: string
+  items: NavigationItem[]
+}
+
 export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
-  const { user: currentUser, isHR } = useAuth()
+  const { user: currentUser } = useAuth()
   const { isDootask } = useDootaskContext()
   const { unreadInvitations, unreadEvaluations } = useUnreadContext()
 
-  // 根据用户角色生成角色徽章
   const getRoleBadge = (role: string) => {
-    switch (role) {
-      case "hr":
-        return <Badge variant="destructive">HR</Badge>
-      case "manager":
-        return <Badge variant="default">主管</Badge>
-    }
+    const code = normalizeRoleCode(role)
+    const variant = code === "super_admin" ? "destructive" : code === "employee" ? "outline" : "secondary"
+    return <Badge variant={variant}>{getRoleLabel(code)}</Badge>
   }
 
-  // 根据用户角色动态生成导航菜单
   const navigation = useMemo(() => {
-    let menus = []
-    if (isHR) {
-      menus = [
-        {
-          category: "核心功能",
-          items: [
-            { name: "仪表板", href: "/", icon: Home },
-            {
-              name: "考核管理",
-              href: "/evaluations",
-              icon: FileText,
-              badge: unreadEvaluations > 0 ? unreadEvaluations : undefined,
-            },
-            {
-              name: "邀请评分",
-              href: "/invitations",
-              icon: MessageSquare,
-              badge: unreadInvitations > 0 ? unreadInvitations : undefined,
-            },
-            { name: "统计分析", href: "/statistics", icon: BarChart3 },
-          ],
-        },
-        {
-          category: "管理功能",
-          items: [
-            { name: "部门管理", href: "/departments", icon: Building },
-            { name: "员工管理", href: "/employees", icon: Users },
-            { name: "KPI模板", href: "/templates", icon: ClipboardList },
-            { name: "绩效规则", href: "/performance-rules", icon: Scale },
-          ],
-        },
-        {
-          category: "其他功能",
-          items: [
-            { name: "备份还原", href: "/backup", icon: Database },
-            { name: "系统设置", href: "/settings", icon: Settings, hidden: isDootask },
-            { name: "帮助中心", href: "/help", icon: HelpCircle },
-          ],
-        },
-      ]
-    } else {
-      menus = [
-        {
-          category: "我的功能",
-          items: [
-            {
-              name: "考核管理",
-              href: "/evaluations",
-              icon: FileText,
-              badge: unreadEvaluations > 0 ? unreadEvaluations : undefined,
-            },
-            {
-              name: "邀请评分",
-              href: "/invitations",
-              icon: MessageSquare,
-              badge: unreadInvitations > 0 ? unreadInvitations : undefined,
-            },
-          ],
-        },
-        {
-          category: "系统功能",
-          items: [
-            { name: "系统设置", href: "/settings", icon: Settings },
-            { name: "帮助中心", href: "/help", icon: HelpCircle },
-          ],
-        },
-      ]
-    }
+    const permissions = currentUser?.permissions || []
+    const menus: NavigationSection[] = [
+      {
+        category: "工作台",
+        items: [
+          { name: "仪表板", href: "/", icon: Home, permission: "report:company" },
+          { name: "考核管理", href: "/evaluations", icon: FileText, permission: "assessment:view", badge: unreadEvaluations || undefined },
+          { name: "邀请评分", href: "/invitations", icon: MessageSquare, permission: "review:view", badge: unreadInvitations || undefined },
+          { name: "统计分析", href: "/statistics", icon: BarChart3, permission: "report:company" },
+        ],
+      },
+      {
+        category: "组织与绩效",
+        items: [
+          { name: "部门管理", href: "/departments", icon: Building, permission: "department:view" },
+          { name: "员工管理", href: "/employees", icon: Users, permission: "employee:create" },
+          { name: "KPI 模板", href: "/templates", icon: ClipboardList, permission: "kpi:view" },
+          { name: "绩效规则", href: "/performance-rules", icon: Scale, permission: "kpi:edit" },
+        ],
+      },
+      {
+        category: "系统",
+        items: [
+          { name: "备份还原", href: "/backup", icon: Database, permission: "system:edit" },
+          { name: "系统设置", href: "/settings", icon: Settings, hidden: isDootask },
+          { name: "帮助中心", href: "/help", icon: HelpCircle },
+        ],
+      },
+    ]
 
     return menus
       .map(menu => ({
         ...menu,
-        items: menu.items.filter(item => !("hidden" in item && item.hidden)),
+        items: menu.items.filter(item => !item.hidden && (!item.permission || permissions.includes(item.permission))),
       }))
       .filter(menu => menu.items.length > 0)
-  }, [isHR, isDootask, unreadInvitations, unreadEvaluations])
+  }, [currentUser?.permissions, isDootask, unreadInvitations, unreadEvaluations])
 
   // 点击导航项时关闭移动端菜单
   const handleNavClick = () => {
     setIsMobileMenuOpen(false)
   }
 
-  // 监听用户角色变化
   useEffect(() => {
-    if (isHR) return
-
-    if (!["/evaluations", "/invitations", "/settings", "/help", "/status"].includes(pathname)) {
-      router.push("/evaluations")
-    }
-  }, [isHR, router, pathname])
+    if (!currentUser) return
+    const restrictedRoots = ["/", "/evaluations", "/invitations", "/statistics", "/departments", "/employees", "/templates", "/performance-rules", "/backup"]
+    const currentRoot = restrictedRoots.find(root => root === "/" ? pathname === "/" : pathname === root || pathname.startsWith(`${root}/`))
+    if (!currentRoot) return
+    const allowed = navigation.flatMap(section => section.items).some(item => item.href === currentRoot)
+    if (!allowed) router.replace(getDefaultLandingPath(currentUser.permissions))
+  }, [currentUser, navigation, pathname, router])
 
   // 监听屏幕尺寸变化，在桌面端自动关闭移动菜单
   useEffect(() => {

@@ -171,6 +171,14 @@ func GetDepartmentStats(c *gin.Context) {
 		})
 		return
 	}
+	userID := c.GetUint("user_id")
+	if DataScopeForUser(userID) != "ALL" {
+		var user models.Employee
+		if models.DB.Select("department_id").First(&user, userID).Error != nil || user.DepartmentID != uint(departmentId) {
+			c.JSON(http.StatusForbidden, gin.H{"error": "超出数据范围"})
+			return
+		}
+	}
 
 	var stats struct {
 		DepartmentInfo  models.Department `json:"department_info"`
@@ -290,6 +298,10 @@ func GetEmployeeStats(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "无效的员工ID",
 		})
+		return
+	}
+	if !CanAccessEmployee(c.GetUint("user_id"), uint(employeeId)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "超出数据范围"})
 		return
 	}
 

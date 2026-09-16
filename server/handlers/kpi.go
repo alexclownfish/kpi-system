@@ -176,7 +176,8 @@ func GetEvaluations(c *gin.Context) {
 	}
 
 	// 构建查询
-	query := models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores")
+	userID := c.GetUint("user_id")
+	query := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores"), userID)
 
 	// 添加筛选条件
 	if status != "" {
@@ -212,7 +213,7 @@ func GetEvaluations(c *gin.Context) {
 	// 构建基础统计查询（不含 status 筛选，用于统计卡片）
 	// 只统计在职员工的评估
 	buildStatsQuery := func() *gorm.DB {
-		statsQuery := models.DB.Model(&models.KPIEvaluation{}).
+		statsQuery := ApplyEvaluationScope(models.DB.Model(&models.KPIEvaluation{}), userID).
 			Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
 			Where("employees.is_active = ?", true)
 		if employeeID != "" {
@@ -452,7 +453,7 @@ func GetEvaluation(c *gin.Context) {
 	}
 
 	var evaluation models.KPIEvaluation
-	result := models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores.Item").First(&evaluation, evaluationId)
+	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores.Item"), c.GetUint("user_id")).First(&evaluation, evaluationId)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "评估不存在",
@@ -477,7 +478,7 @@ func UpdateEvaluation(c *gin.Context) {
 	}
 
 	var evaluation models.KPIEvaluation
-	result := models.DB.Preload("Employee").First(&evaluation, evaluationId)
+	result := ApplyEvaluationScope(models.DB.Preload("Employee"), c.GetUint("user_id")).First(&evaluation, evaluationId)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "评估不存在",
@@ -809,7 +810,7 @@ func GetEmployeeEvaluations(c *gin.Context) {
 	}
 
 	var evaluations []models.KPIEvaluation
-	result := models.DB.Preload("Template").Preload("Scores").Where("employee_id = ?", empId).Find(&evaluations)
+	result := ApplyEvaluationScope(models.DB.Preload("Template").Preload("Scores"), c.GetUint("user_id")).Where("kpi_evaluations.employee_id = ?", empId).Find(&evaluations)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取员工评估记录失败",
@@ -838,7 +839,7 @@ func GetPendingEvaluations(c *gin.Context) {
 	var evaluations []models.KPIEvaluation
 
 	// 获取需要当前员工处理的评估
-	result := models.DB.Preload("Employee.Department").Preload("Template").Where("employee_id = ? AND status IN ?", empId, []string{"pending", "self_evaluated"}).Find(&evaluations)
+	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template"), c.GetUint("user_id")).Where("kpi_evaluations.employee_id = ? AND status IN ?", empId, []string{"pending", "self_evaluated"}).Find(&evaluations)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取待处理评估失败",
@@ -926,6 +927,10 @@ func GetEvaluationScores(c *gin.Context) {
 	}
 
 	var scores []models.KPIScore
+	if !CanAccessEvaluation(c.GetUint("user_id"), uint(evalId)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "超出数据范围"})
+		return
+	}
 	result := models.DB.Preload("Item").Where("evaluation_id = ?", evalId).Find(&scores)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{

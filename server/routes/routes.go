@@ -38,8 +38,8 @@ func SetupRoutes(r *gin.RouterGroup) {
 	// 系统设置（公开，部分需要HR权限）
 	settingsRoutes := r.Group("/settings")
 	{
-		settingsRoutes.GET("", handlers.GetSystemSettings)                                   // 所有用户可以读取设置
-		settingsRoutes.PUT("", handlers.RoleMiddleware("hr"), handlers.UpdateSystemSettings) // 只有HR可以修改设置
+		settingsRoutes.GET("", handlers.GetSystemSettings) // 所有用户可以读取设置
+		settingsRoutes.PUT("", handlers.AuthMiddleware(), handlers.PermissionMiddleware("system:edit"), handlers.UpdateSystemSettings)
 	}
 
 	// 文件下载（公开）
@@ -62,66 +62,69 @@ func SetupRoutes(r *gin.RouterGroup) {
 	{
 		// 当前用户信息
 		protected.GET("/me", handlers.GetCurrentUser)
+		protected.GET("/roles", handlers.PermissionAnyMiddleware("employee:assign_role", "role:view"), handlers.GetRoles)
+		protected.GET("/permissions", handlers.PermissionMiddleware("role:view"), handlers.GetPermissions)
 
 		// 部门管理（HR和管理员）
 		departmentRoutes := protected.Group("/departments")
 		{
-			departmentRoutes.GET("", handlers.GetDepartments)
-			departmentRoutes.POST("", handlers.RoleMiddleware("hr", "manager"), handlers.CreateDepartment)
+			departmentRoutes.GET("", handlers.PermissionMiddleware("department:view"), handlers.GetDepartments)
+			departmentRoutes.POST("", handlers.PermissionMiddleware("department:create"), handlers.CreateDepartment)
 			departmentRoutes.GET("/:id", handlers.GetDepartment)
-			departmentRoutes.PUT("/:id", handlers.RoleMiddleware("hr", "manager"), handlers.UpdateDepartment)
-			departmentRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteDepartment)
+			departmentRoutes.PUT("/:id", handlers.PermissionMiddleware("department:edit"), handlers.UpdateDepartment)
+			departmentRoutes.DELETE("/:id", handlers.PermissionMiddleware("department:delete"), handlers.DeleteDepartment)
 		}
 
 		// 员工管理
 		employeeRoutes := protected.Group("/employees")
 		{
-			employeeRoutes.GET("", handlers.GetEmployees)
-			employeeRoutes.POST("", handlers.RoleMiddleware("hr", "manager"), handlers.CreateEmployee)
-			employeeRoutes.GET("/:id", handlers.GetEmployee)
-			employeeRoutes.PUT("/:id", handlers.RoleMiddleware("hr", "manager"), handlers.UpdateEmployee)
-			employeeRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteEmployee)
-			employeeRoutes.GET("/:id/subordinates", handlers.GetEmployeeSubordinates)
+			employeeRoutes.GET("", handlers.PermissionMiddleware("employee:view"), handlers.GetEmployees)
+			employeeRoutes.POST("", handlers.PermissionMiddleware("employee:create"), handlers.CreateEmployee)
+			employeeRoutes.GET("/:id", handlers.PermissionMiddleware("employee:view"), handlers.GetEmployee)
+			employeeRoutes.PUT("/:id", handlers.PermissionMiddleware("employee:edit"), handlers.UpdateEmployee)
+			employeeRoutes.PUT("/:id/roles", handlers.PermissionMiddleware("employee:assign_role"), handlers.AssignEmployeeRole)
+			employeeRoutes.DELETE("/:id", handlers.PermissionMiddleware("employee:delete"), handlers.DeleteEmployee)
+			employeeRoutes.GET("/:id/subordinates", handlers.PermissionMiddleware("employee:view"), handlers.GetEmployeeSubordinates)
 		}
 
 		// KPI模板管理（HR和管理员）
 		templateRoutes := protected.Group("/templates")
 		{
-			templateRoutes.GET("", handlers.GetTemplates)
-			templateRoutes.POST("", handlers.RoleMiddleware("hr", "manager"), handlers.CreateTemplate)
-			templateRoutes.GET("/:id", handlers.GetTemplate)
-			templateRoutes.PUT("/:id", handlers.RoleMiddleware("hr", "manager"), handlers.UpdateTemplate)
-			templateRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteTemplate)
+			templateRoutes.GET("", handlers.PermissionMiddleware("kpi:view"), handlers.GetTemplates)
+			templateRoutes.POST("", handlers.PermissionMiddleware("kpi:create"), handlers.CreateTemplate)
+			templateRoutes.GET("/:id", handlers.PermissionMiddleware("kpi:view"), handlers.GetTemplate)
+			templateRoutes.PUT("/:id", handlers.PermissionMiddleware("kpi:edit"), handlers.UpdateTemplate)
+			templateRoutes.DELETE("/:id", handlers.PermissionMiddleware("kpi:delete"), handlers.DeleteTemplate)
 			templateRoutes.GET("/:id/items", handlers.GetTemplateItems)
 		}
 
 		// 绩效规则管理（仅HR）
 		performanceRuleRoutes := protected.Group("/performance-rules")
 		{
-			performanceRuleRoutes.GET("", handlers.RoleMiddleware("hr"), handlers.GetPerformanceRule)
-			performanceRuleRoutes.PUT("", handlers.RoleMiddleware("hr"), handlers.UpdatePerformanceRule)
+			performanceRuleRoutes.GET("", handlers.PermissionMiddleware("kpi:view"), handlers.GetPerformanceRule)
+			performanceRuleRoutes.PUT("", handlers.PermissionMiddleware("kpi:edit"), handlers.UpdatePerformanceRule)
 		}
 
 		// KPI考核项目管理（HR和管理员）
 		itemRoutes := protected.Group("/items")
 		{
-			itemRoutes.POST("", handlers.RoleMiddleware("hr", "manager"), handlers.CreateItem)
+			itemRoutes.POST("", handlers.PermissionMiddleware("kpi:create"), handlers.CreateItem)
 			itemRoutes.GET("/:id", handlers.GetItem)
-			itemRoutes.PUT("/:id", handlers.RoleMiddleware("hr", "manager"), handlers.UpdateItem)
-			itemRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteItem)
+			itemRoutes.PUT("/:id", handlers.PermissionMiddleware("kpi:edit"), handlers.UpdateItem)
+			itemRoutes.DELETE("/:id", handlers.PermissionMiddleware("kpi:delete"), handlers.DeleteItem)
 		}
 
 		// KPI评估管理
 		evaluationRoutes := protected.Group("/evaluations")
 		{
-			evaluationRoutes.GET("", handlers.GetEvaluations)
-			evaluationRoutes.POST("", handlers.RoleMiddleware("hr", "manager"), handlers.CreateEvaluation)
-			evaluationRoutes.GET("/:id", handlers.GetEvaluation)
-			evaluationRoutes.PUT("/:id", handlers.UpdateEvaluation)
-			evaluationRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteEvaluation)
-			evaluationRoutes.GET("/employee/:employeeId", handlers.GetEmployeeEvaluations)
-			evaluationRoutes.GET("/pending/:employeeId", handlers.GetPendingEvaluations)
-			evaluationRoutes.GET("/pending/count", handlers.GetPendingCountEvaluations)
+			evaluationRoutes.GET("", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluations)
+			evaluationRoutes.POST("", handlers.PermissionMiddleware("assessment:create"), handlers.CreateEvaluation)
+			evaluationRoutes.GET("/:id", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluation)
+			evaluationRoutes.PUT("/:id", handlers.PermissionAnyMiddleware("assessment:edit", "assessment:submit", "assessment:review", "assessment:approve"), handlers.UpdateEvaluation)
+			evaluationRoutes.DELETE("/:id", handlers.PermissionMiddleware("assessment:delete"), handlers.DeleteEvaluation)
+			evaluationRoutes.GET("/employee/:employeeId", handlers.PermissionMiddleware("assessment:view"), handlers.GetEmployeeEvaluations)
+			evaluationRoutes.GET("/pending/:employeeId", handlers.PermissionMiddleware("assessment:view"), handlers.GetPendingEvaluations)
+			evaluationRoutes.GET("/pending/count", handlers.PermissionMiddleware("assessment:view"), handlers.GetPendingCountEvaluations)
 
 			// 评论管理（所有认证用户）
 			evaluationRoutes.GET("/:id/comments", handlers.GetEvaluationComments)
@@ -130,29 +133,29 @@ func SetupRoutes(r *gin.RouterGroup) {
 			evaluationRoutes.DELETE("/:id/comments/:comment_id", handlers.DeleteEvaluationComment)
 
 			// 邀请评分管理（HR发起邀请）
-			evaluationRoutes.POST("/:id/invitations", handlers.RoleMiddleware("hr"), handlers.CreateInvitation)
+			evaluationRoutes.POST("/:id/invitations", handlers.PermissionMiddleware("review:create"), handlers.CreateInvitation)
 			// 获取邀请列表：HR可以查看所有，被评估员工和被邀请人可以查看相关邀请（权限检查在函数内部）
 			evaluationRoutes.GET("/:id/invitations", handlers.GetEvaluationInvitations)
 
 			// 异议处理
-			evaluationRoutes.POST("/:id/objection", handlers.SubmitObjection)                                      // 员工提交异议
-			evaluationRoutes.PUT("/:id/objection/handle", handlers.RoleMiddleware("hr"), handlers.HandleObjection) // HR处理异议
+			evaluationRoutes.POST("/:id/objection", handlers.SubmitObjection) // 员工提交异议
+			evaluationRoutes.PUT("/:id/objection/handle", handlers.PermissionMiddleware("assessment:approve"), handlers.HandleObjection)
 		}
 
 		// 邀请评分管理
 		invitationRoutes := protected.Group("/invitations")
 		{
-			invitationRoutes.GET("/my", handlers.GetMyInvitations)                                            // 获取我的邀请列表
-			invitationRoutes.GET("/sent", handlers.GetMySentInvitations)                                      // 获取我发出的邀请列表
-			invitationRoutes.GET("/:id", handlers.GetInvitationDetails)                                       // 获取邀请详情
-			invitationRoutes.PUT("/:id/accept", handlers.AcceptInvitation)                                    // 接受邀请
-			invitationRoutes.PUT("/:id/decline", handlers.DeclineInvitation)                                  // 拒绝邀请
-			invitationRoutes.PUT("/:id/complete", handlers.CompleteInvitation)                                // 完成邀请评分
-			invitationRoutes.GET("/:id/scores", handlers.GetInvitationScores)                                 // 获取邀请评分
-			invitationRoutes.PUT("/:id/cancel", handlers.RoleMiddleware("hr"), handlers.CancelInvitation)     // 撤销邀请
-			invitationRoutes.PUT("/:id/reinvite", handlers.RoleMiddleware("hr"), handlers.ReinviteInvitation) // 重新邀请
-			invitationRoutes.DELETE("/:id", handlers.RoleMiddleware("hr"), handlers.DeleteInvitation)         // 删除邀请
-			invitationRoutes.GET("/pending/count", handlers.GetPendingCountInvitations)                       // 获取待确认邀请数量
+			invitationRoutes.GET("/my", handlers.GetMyInvitations)             // 获取我的邀请列表
+			invitationRoutes.GET("/sent", handlers.GetMySentInvitations)       // 获取我发出的邀请列表
+			invitationRoutes.GET("/:id", handlers.GetInvitationDetails)        // 获取邀请详情
+			invitationRoutes.PUT("/:id/accept", handlers.AcceptInvitation)     // 接受邀请
+			invitationRoutes.PUT("/:id/decline", handlers.DeclineInvitation)   // 拒绝邀请
+			invitationRoutes.PUT("/:id/complete", handlers.CompleteInvitation) // 完成邀请评分
+			invitationRoutes.GET("/:id/scores", handlers.GetInvitationScores)  // 获取邀请评分
+			invitationRoutes.PUT("/:id/cancel", handlers.PermissionMiddleware("review:manage"), handlers.CancelInvitation)
+			invitationRoutes.PUT("/:id/reinvite", handlers.PermissionMiddleware("review:manage"), handlers.ReinviteInvitation)
+			invitationRoutes.DELETE("/:id", handlers.PermissionMiddleware("review:manage"), handlers.DeleteInvitation)
+			invitationRoutes.GET("/pending/count", handlers.GetPendingCountInvitations) // 获取待确认邀请数量
 		}
 
 		// 邀请评分记录管理
@@ -164,26 +167,26 @@ func SetupRoutes(r *gin.RouterGroup) {
 		// KPI评分管理（所有认证用户）
 		scoreRoutes := protected.Group("/scores")
 		{
-			scoreRoutes.GET("/evaluation/:evaluationId", handlers.GetEvaluationScores)
+			scoreRoutes.GET("/evaluation/:evaluationId", handlers.PermissionAnyMiddleware("assessment:view", "review:view"), handlers.GetEvaluationScores)
 			scoreRoutes.PUT("/:id/self", handlers.UpdateSelfScore)
-			scoreRoutes.PUT("/:id/manager", handlers.RoleMiddleware("manager", "hr"), handlers.UpdateManagerScore)
-			scoreRoutes.PUT("/:id/hr", handlers.RoleMiddleware("hr"), handlers.UpdateHRScore)
-			scoreRoutes.PUT("/:id/final", handlers.RoleMiddleware("hr"), handlers.UpdateFinalScore)
+			scoreRoutes.PUT("/:id/manager", handlers.PermissionMiddleware("assessment:review"), handlers.UpdateManagerScore)
+			scoreRoutes.PUT("/:id/hr", handlers.PermissionMiddleware("assessment:review"), handlers.UpdateHRScore)
+			scoreRoutes.PUT("/:id/final", handlers.PermissionMiddleware("assessment:approve"), handlers.UpdateFinalScore)
 		}
 
 		// 统计分析（所有认证用户）
 		statsRoutes := protected.Group("/statistics")
 		{
-			statsRoutes.GET("/dashboard", handlers.GetDashboardStats)
-			statsRoutes.GET("/department/:id", handlers.GetDepartmentStats)
-			statsRoutes.GET("/employee/:id", handlers.GetEmployeeStats)
-			statsRoutes.GET("/trends", handlers.GetTrends)
-			statsRoutes.GET("/data", handlers.GetStatisticsData)
+			statsRoutes.GET("/dashboard", handlers.PermissionMiddleware("report:company"), handlers.GetDashboardStats)
+			statsRoutes.GET("/department/:id", handlers.PermissionMiddleware("report:department"), handlers.GetDepartmentStats)
+			statsRoutes.GET("/employee/:id", handlers.PermissionAnyMiddleware("report:personal", "report:department", "report:company"), handlers.GetEmployeeStats)
+			statsRoutes.GET("/trends", handlers.PermissionMiddleware("report:company"), handlers.GetTrends)
+			statsRoutes.GET("/data", handlers.PermissionMiddleware("report:company"), handlers.GetStatisticsData)
 		}
 
 		// 导出功能（管理员和HR）
 		exportRoutes := protected.Group("/export")
-		exportRoutes.Use(handlers.RoleMiddleware("hr", "manager"))
+		exportRoutes.Use(handlers.PermissionMiddleware("report:export"))
 		{
 			exportRoutes.GET("/evaluation/:id", handlers.ExportEvaluationToExcel)
 			exportRoutes.GET("/department/:id", handlers.ExportDepartmentToExcel)
@@ -192,7 +195,7 @@ func SetupRoutes(r *gin.RouterGroup) {
 
 		// 备份管理（仅HR）
 		backupRoutes := protected.Group("/backup")
-		backupRoutes.Use(handlers.RoleMiddleware("hr"))
+		backupRoutes.Use(handlers.PermissionMiddleware("system:edit"))
 		{
 			backupRoutes.POST("", handlers.CreateBackup)
 			backupRoutes.GET("", handlers.GetBackupHistory)

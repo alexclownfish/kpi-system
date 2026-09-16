@@ -14,6 +14,8 @@ import (
 // 获取所有员工
 func GetEmployees(c *gin.Context) {
 	var employees []models.Employee
+	userID, _ := c.Get("user_id")
+	currentUserID, _ := userID.(uint)
 
 	// 解析分页参数
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
@@ -32,7 +34,7 @@ func GetEmployees(c *gin.Context) {
 	}
 
 	// 构建查询
-	query := models.DB.Preload("Department").Preload("Manager")
+	query := ApplyEmployeeScope(models.DB.Preload("Department").Preload("Manager"), currentUserID)
 
 	// 添加搜索条件
 	if search != "" {
@@ -63,7 +65,7 @@ func GetEmployees(c *gin.Context) {
 
 	// 获取总数
 	var total int64
-	countQuery := models.DB.Model(&models.Employee{})
+	countQuery := ApplyEmployeeScope(models.DB.Model(&models.Employee{}), currentUserID)
 	if search != "" {
 		searchPattern := "%" + search + "%"
 		countQuery = countQuery.Where("name LIKE ? OR email LIKE ? OR position LIKE ?",
@@ -132,6 +134,29 @@ func CreateEmployee(c *gin.Context) {
 	if employee.Role == "" {
 		employee.Role = "employee"
 	}
+	roleCode := LegacyRoleCode(employee.Role)
+	var role models.Role
+	if err := models.DB.Where("code = ?", roleCode).First(&role).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "角色不存在"})
+		return
+	}
+	if roleCode == "super_admin" && !HasPermission(c, "role:edit") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "只有超级管理员可以创建超级管理员"})
+		return
+	}
+	employee.Role = LegacyRoleValue(roleCode)
+	if strings.TrimSpace(employee.Password) == "" || len(employee.Password) < 6 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "初始密码长度不能少于6位"})
+		return
+	}
+	if !strings.HasPrefix(employee.Password, "$2a$") && !strings.HasPrefix(employee.Password, "$2b$") && !strings.HasPrefix(employee.Password, "$2y$") {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(employee.Password), bcrypt.DefaultCost)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "密码加密失败"})
+			return
+		}
+		employee.Password = string(hashedPassword)
+	}
 	if employee.Role == "employee" && (employee.ManagerID == nil || *employee.ManagerID == 0) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "普通员工必须选择直属上级",
@@ -139,14 +164,26 @@ func CreateEmployee(c *gin.Context) {
 		return
 	}
 
-	result := models.DB.Create(&employee)
+	tx := models.DB.Begin()
+	result := tx.Create(&employee)
 	if result.Error != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "创建员工失败",
 			"message": result.Error.Error(),
 		})
 		return
 	}
+	if err := ReplaceUserRole(tx, employee.ID, roleCode); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "员工角色初始化失败"})
+		return
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "员工创建失败"})
+		return
+	}
+	RecordAudit(c, "create_employee", "employee", strconv.FormatUint(uint64(employee.ID), 10), "SUCCESS")
 
 	// 获取完整的员工信息
 	models.DB.Preload("Department").Preload("Manager").First(&employee, employee.ID)
@@ -169,14 +206,15 @@ func GetEmployee(c *gin.Context) {
 	}
 
 	var employee models.Employee
-	result := models.DB.Preload("Department").Preload("Manager").Preload("Subordinates").First(&employee, employeeId)
+	userID, _ := c.Get("user_id")
+	currentUserID, _ := userID.(uint)
+	result := ApplyEmployeeScope(models.DB.Preload("Department").Preload("Manager").Preload("Subordinates"), currentUserID).First(&employee, employeeId)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "员工不存在",
 		})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"data": employee,
 	})
@@ -214,6 +252,10 @@ func UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
+	if LegacyRoleCode(employee.Role) == "super_admin" && !HasPermission(c, "role:edit") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "只有超级管理员可以修改超级管理员"})
+		return
+	}
 
 	var updateData UpdateEmployeeRequest
 	if err := c.ShouldBindJSON(&updateData); err != nil {
@@ -222,6 +264,16 @@ func UpdateEmployee(c *gin.Context) {
 			"message": err.Error(),
 		})
 		return
+	}
+	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
+		if !HasPermission(c, "employee:assign_role") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "无权修改员工角色"})
+			return
+		}
+		if (LegacyRoleCode(employee.Role) == "super_admin" || LegacyRoleCode(updateData.Role) == "super_admin") && !HasPermission(c, "role:edit") {
+			c.JSON(http.StatusForbidden, gin.H{"error": "只有超级管理员可以变更超级管理员角色"})
+			return
+		}
 	}
 
 	targetRole := updateData.Role
@@ -242,7 +294,7 @@ func UpdateEmployee(c *gin.Context) {
 
 	// 密码重置属于 HR 管理操作，避免主管通过接口修改员工登录凭据。
 	if updateData.Password != "" {
-		if c.GetString("user_role") != "hr" {
+		if !HasPermission(c, "employee:edit") {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "只有HR可以修改员工密码",
 			})
@@ -259,6 +311,8 @@ func UpdateEmployee(c *gin.Context) {
 	roleValue := updateData.Role
 	if roleValue == "" {
 		roleValue = employee.Role
+	} else {
+		roleValue = LegacyRoleValue(roleValue)
 	}
 	managerValue := updateData.ManagerID
 	if updateData.Role == "" && updateData.ManagerID == nil {
@@ -288,13 +342,30 @@ func UpdateEmployee(c *gin.Context) {
 		updateMap["password"] = string(hashedPassword)
 	}
 
-	result = models.DB.Model(&employee).Updates(updateMap)
+	tx := models.DB.Begin()
+	result = tx.Model(&employee).Updates(updateMap)
 	if result.Error != nil {
+		tx.Rollback()
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "更新员工失败",
 			"message": result.Error.Error(),
 		})
 		return
+	}
+	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
+		if err := ReplaceUserRole(tx, employee.ID, updateData.Role); err != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "员工角色更新失败"})
+			return
+		}
+	}
+	if err := tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "员工更新失败"})
+		return
+	}
+	RecordAudit(c, "update_employee", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS")
+	if updateData.Password != "" {
+		RecordAudit(c, "reset_password", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS")
 	}
 
 	// 获取完整的员工信息
@@ -314,6 +385,15 @@ func DeleteEmployee(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "无效的员工ID",
 		})
+		return
+	}
+	var employee models.Employee
+	if err := models.DB.Select("id", "role").First(&employee, employeeId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "员工不存在"})
+		return
+	}
+	if LegacyRoleCode(employee.Role) == "super_admin" && !HasPermission(c, "role:edit") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "只有超级管理员可以删除超级管理员"})
 		return
 	}
 
@@ -345,6 +425,7 @@ func DeleteEmployee(c *gin.Context) {
 		})
 		return
 	}
+	RecordAudit(c, "delete_employee", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS")
 
 	c.JSON(http.StatusOK, gin.H{
 		"message": "员工删除成功",
@@ -360,6 +441,20 @@ func GetEmployeeSubordinates(c *gin.Context) {
 			"error": "无效的员工ID",
 		})
 		return
+	}
+	currentUser, _ := c.Get("user_id")
+	currentUserID, _ := currentUser.(uint)
+	scope := DataScopeForUser(currentUserID)
+	if scope == "SELF" || scope == "ASSIGNED" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权查看下属"})
+		return
+	}
+	if scope == "DEPARTMENT" || scope == "DEPARTMENT_TREE" {
+		var target, owner models.Employee
+		if models.DB.Select("department_id").First(&target, employeeId).Error != nil || models.DB.Select("department_id").First(&owner, currentUserID).Error != nil || target.DepartmentID != owner.DepartmentID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "超出数据范围"})
+			return
+		}
 	}
 
 	var subordinates []models.Employee

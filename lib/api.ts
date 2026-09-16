@@ -70,6 +70,24 @@ export interface Employee {
   manager?: { name: string }
 }
 
+export interface Permission {
+  id: number
+  code: string
+  name: string
+  resource: string
+  action: string
+  description?: string
+}
+
+export interface Role {
+  id: number
+  code: string
+  name: string
+  description?: string
+  is_system: boolean
+  permissions?: Permission[]
+}
+
 export type EmployeeUpdateRequest = Omit<Partial<Employee>, "manager_id"> & {
   manager_id?: number | null
   password?: string
@@ -298,6 +316,8 @@ export interface RegisterRequest {
 export interface LoginResponse {
   token: string
   user: Employee
+  permissions?: string[]
+  data_scope?: string
 }
 
 export interface AuthUser {
@@ -312,6 +332,8 @@ export interface AuthUser {
   created_at: string
   department?: { name: string }
   manager?: { name: string }
+  permissions?: string[]
+  data_scope?: string
 }
 
 // 部门API
@@ -376,8 +398,15 @@ export const employeeApi = {
   create: (data: Omit<Employee, "id" | "created_at">): Promise<{ data: Employee }> => api.post("/employees", data),
   update: (id: number, data: EmployeeUpdateRequest): Promise<{ data: Employee }> => api.put(`/employees/${id}`, data),
   delete: (id: number): Promise<void> => api.delete(`/employees/${id}`),
+  assignRole: (id: number, roleCode: string): Promise<{ message: string; role: Role }> =>
+    api.put(`/employees/${id}/roles`, { role_code: roleCode }),
   getSubordinates: (id: number): Promise<{ data: Employee[]; total: number }> =>
     api.get(`/employees/${id}/subordinates`),
+}
+
+export const accessControlApi = {
+  getRoles: (): Promise<{ data: Role[]; total: number }> => api.get("/roles"),
+  getPermissions: (): Promise<{ data: Permission[]; total: number }> => api.get("/permissions"),
 }
 
 // KPI模板API
@@ -517,7 +546,7 @@ export const authApi = {
   register: (data: RegisterRequest): Promise<LoginResponse> => api.post("/auth/register", data),
 
   // 获取当前用户信息
-  getCurrentUser: (): Promise<{ data: AuthUser }> => api.get("/me"),
+  getCurrentUser: (): Promise<{ data: AuthUser; permissions?: string[]; data_scope?: string }> => api.get("/me"),
 
   // 刷新token
   refreshToken: (): Promise<{ token: string }> => api.post("/auth/refresh"),
