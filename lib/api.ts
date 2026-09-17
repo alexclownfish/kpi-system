@@ -70,6 +70,13 @@ export interface Employee {
   manager?: { name: string }
 }
 
+export interface DataScope {
+  id: number
+  code: "SELF" | "DIRECT_SUBORDINATES" | "DEPARTMENT" | "ASSIGNED" | "ALL"
+  name: string
+  description?: string
+}
+
 export type CreateEmployeeRequest = Omit<Employee, "id" | "created_at" | "manager_id"> & {
   manager_id?: number | null
   // 兼容历史调用点；当前员工页面会在提交前校验并始终传入。
@@ -91,7 +98,20 @@ export interface Role {
   name: string
   description?: string
   is_system: boolean
+  requires_manager: boolean
   permissions?: Permission[]
+  data_scope?: DataScope
+  permission_count?: number
+  user_count?: number
+  assignable?: boolean
+}
+
+export interface RoleMutationRequest {
+  name: string
+  description: string
+  data_scope_code: string
+  requires_manager: boolean
+  permission_ids: number[]
 }
 
 export type EmployeeUpdateRequest = Omit<Partial<Employee>, "manager_id"> & {
@@ -136,6 +156,33 @@ export interface KPIEvaluation {
   employee?: Employee
   template?: KPITemplate
   scores?: KPIScore[]
+}
+
+export interface EvaluationResultSnapshot {
+  id: number
+  evaluation_id: number
+  version: number
+  checksum: string
+  created_by: number
+  created_at: string
+}
+
+export interface EvaluationConfirmation {
+  id: number
+  evaluation_id: number
+  snapshot_id: number
+  method: "online" | "paper"
+  confirmed_by: number
+  confirmed_at: string
+  signed_at?: string
+  handled_by?: number
+  attachment_name?: string
+  attachment_content_type?: string
+  attachment_size?: number
+  remark: string
+  snapshot: EvaluationResultSnapshot
+  confirmer?: Employee
+  handler?: Employee
 }
 
 export interface KPIScore {
@@ -280,6 +327,56 @@ export interface ExportResponse {
   file_name: string
   file_size: number
   message: string
+  result_version?: number
+  checksum?: string
+}
+
+export interface FinalScoreImportRow {
+  row: number
+  evaluation_id?: number
+  score_id?: number
+  employee?: string
+  item?: string
+  score?: number
+  comment?: string
+  status: "valid" | "invalid"
+  message: string
+}
+
+export interface FinalScoreImportPreview {
+  message: string
+  batch_id: string
+  expires_at: string
+  summary: {
+    total_rows: number
+    valid_rows: number
+    invalid_rows: number
+    valid_evaluations: number
+    invalid_evaluations: number
+  }
+  rows: FinalScoreImportRow[]
+}
+
+export interface SignoffStatistics {
+  summary: {
+    total: number
+    online: number
+    paper: number
+    pending: number
+    received: number
+    recovery_rate: number
+  }
+  items: Array<{
+    evaluation_id: number
+    employee: string
+    department: string
+    period: string
+    total_score: number
+    status: string
+    method: "pending" | "online" | "paper"
+    confirmed_at?: string
+    handler?: string
+  }>
 }
 
 // 系统设置请求类型
@@ -411,8 +508,16 @@ export const employeeApi = {
 }
 
 export const accessControlApi = {
-  getRoles: (): Promise<{ data: Role[]; total: number }> => api.get("/roles"),
+  getRoles: (params?: { page?: number; pageSize?: number; search?: string; type?: "system" | "custom" }): Promise<PaginatedResponse<Role>> => api.get("/roles", { params }),
+  getRole: (id: number): Promise<{ data: Role }> => api.get(`/roles/${id}`),
+  createRole: (data: RoleMutationRequest): Promise<{ data: Role; message: string }> => api.post("/roles", data),
+  updateRole: (id: number, data: RoleMutationRequest): Promise<{ data: Role; message: string }> => api.put(`/roles/${id}`, data),
+  cloneRole: (id: number, data: { name: string; description?: string }): Promise<{ data: Role; message: string }> => api.post(`/roles/${id}/clone`, data),
+  deleteRole: (id: number): Promise<{ message: string }> => api.delete(`/roles/${id}`),
   getPermissions: (): Promise<{ data: Permission[]; total: number }> => api.get("/permissions"),
+  getDataScopes: (): Promise<{ data: DataScope[]; total: number }> => api.get("/data-scopes"),
+  getRoleUsers: (id: number, params?: PaginationParams): Promise<PaginatedResponse<Employee>> => api.get(`/roles/${id}/users`, { params }),
+  assignRoleUsers: (id: number, userIds: number[]): Promise<{ message: string }> => api.put(`/roles/${id}/users`, { user_ids: userIds }),
 }
 
 // KPI模板API
@@ -460,6 +565,24 @@ export const evaluationApi = {
     api.post(`/evaluations/${id}/objection`, data),
   handleObjection: (id: number, data: { total_score: number; final_comment: string }): Promise<{ data: KPIEvaluation }> =>
     api.put(`/evaluations/${id}/objection/handle`, data),
+  getConfirmation: (id: number): Promise<{ data: EvaluationConfirmation | null }> =>
+    api.get(`/evaluations/${id}/confirmation`),
+  confirmOnline: (id: number): Promise<{ data: EvaluationConfirmation; evaluation: KPIEvaluation }> =>
+    api.post(`/evaluations/${id}/confirm-online`),
+  confirmPaper: (
+    id: number,
+    data: { signedAt: string; remark: string; file: File }
+  ): Promise<{ data: EvaluationConfirmation; evaluation: KPIEvaluation }> => {
+    const formData = new FormData()
+    formData.append("signed_at", data.signedAt)
+    formData.append("remark", data.remark)
+    formData.append("file", data.file)
+    return api.post(`/evaluations/${id}/confirm-paper`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    })
+  },
+  downloadConfirmationAttachment: (id: number): Promise<Blob> =>
+    api.get(`/evaluations/${id}/confirmation/attachment`, { responseType: "blob" }),
 }
 
 // KPI评分API
@@ -493,6 +616,14 @@ export const statisticsApi = {
     month?: string
     quarter?: string
   }): Promise<{ data: StatisticsResponse }> => api.get("/statistics/data", { params }),
+  getSignoffs: (params?: {
+    department_id?: string
+    year?: string
+    period?: string
+    month?: string
+    quarter?: string
+    status?: string
+  }): Promise<{ data: SignoffStatistics }> => api.get("/statistics/signoffs", { params }),
 }
 
 // 导出API
@@ -501,6 +632,34 @@ export const exportApi = {
   department: (id: number): Promise<ExportResponse> => api.get(`/export/department/${id}`),
   period: (period: string, params?: { year?: string; month?: string; quarter?: string }): Promise<ExportResponse> =>
     api.get(`/export/period/${period}`, { params }),
+  signoffBatch: (params?: {
+    department_id?: string
+    year?: string
+    period?: string
+    month?: string
+    quarter?: string
+    status?: string
+  }): Promise<ExportResponse> => api.get("/export/signoff-batch", { params }),
+}
+
+export const finalScoreImportApi = {
+  template: (params?: {
+    department_id?: string
+    year?: string
+    period?: string
+    month?: string
+    quarter?: string
+  }): Promise<ExportResponse> => api.get("/final-scores/import-template", { params }),
+  preview: (file: File): Promise<FinalScoreImportPreview> => {
+    const form = new FormData()
+    form.append("file", file)
+    return api.post("/final-scores/import/preview", form, { headers: { "Content-Type": "multipart/form-data" } })
+  },
+  commit: (batchId: string): Promise<{
+    message: string
+    summary: { succeeded: number; failed: number }
+    results: Array<{ evaluation_id: number; employee: string; status: string; message: string }>
+  }> => api.post(`/final-scores/import/${batchId}/commit`, { valid_only: true }),
 }
 
 // 评论接口类型

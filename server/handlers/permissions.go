@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"dootask-kpi-server/models"
@@ -113,11 +116,18 @@ func LegacyRoleValue(roleCode string) string {
 
 // AssignDefaultRole ensures existing and newly created users participate in RBAC.
 func AssignDefaultRole(userID uint, legacyRole string) error {
+	var existing int64
+	if err := models.DB.Model(&models.UserRole{}).Where("user_id = ?", userID).Count(&existing).Error; err != nil {
+		return err
+	}
+	if existing > 0 {
+		return nil
+	}
 	var role models.Role
 	if err := models.DB.Where("code = ?", LegacyRoleCode(legacyRole)).First(&role).Error; err != nil {
 		return err
 	}
-	return models.DB.Where("user_id = ? AND role_id = ?", userID, role.ID).FirstOrCreate(&models.UserRole{UserID: userID, RoleID: role.ID}).Error
+	return models.DB.Create(&models.UserRole{UserID: userID, RoleID: role.ID}).Error
 }
 
 func ReplaceUserRole(db *gorm.DB, userID uint, roleCode string) error {
@@ -129,6 +139,152 @@ func ReplaceUserRole(db *gorm.DB, userID uint, roleCode string) error {
 		return err
 	}
 	return db.Create(&models.UserRole{UserID: userID, RoleID: role.ID}).Error
+}
+
+var assignableScopeRank = map[string]int{
+	"SELF":                1,
+	"ASSIGNED":            1,
+	"DIRECT_SUBORDINATES": 2,
+	"DEPARTMENT":          3,
+	"ALL":                 4,
+}
+
+func IsAssignableDataScope(scope string) bool {
+	_, ok := assignableScopeRank[strings.ToUpper(scope)]
+	return ok
+}
+
+func CanGrantDataScope(actorScope, targetScope string) bool {
+	actorRank, actorOK := assignableScopeRank[strings.ToUpper(actorScope)]
+	targetRank, targetOK := assignableScopeRank[strings.ToUpper(targetScope)]
+	return actorOK && targetOK && targetRank <= actorRank
+}
+
+func PermissionCodesByIDs(db *gorm.DB, ids []uint) ([]models.Permission, error) {
+	if len(ids) == 0 {
+		return []models.Permission{}, nil
+	}
+	unique := make(map[uint]struct{}, len(ids))
+	for _, id := range ids {
+		if id == 0 {
+			return nil, errors.New("权限不存在")
+		}
+		unique[id] = struct{}{}
+	}
+	var permissions []models.Permission
+	if err := db.Where("id IN ?", ids).Order("resource, action").Find(&permissions).Error; err != nil {
+		return nil, err
+	}
+	if len(permissions) != len(unique) {
+		return nil, errors.New("包含不存在的权限")
+	}
+	return permissions, nil
+}
+
+// CompletePermissionDependencies automatically adds resource:view whenever a
+// mutating/approval permission is selected and that view permission exists.
+func CompletePermissionDependencies(db *gorm.DB, permissions []models.Permission) ([]models.Permission, error) {
+	byID := make(map[uint]models.Permission, len(permissions))
+	resources := make(map[string]struct{})
+	for _, permission := range permissions {
+		byID[permission.ID] = permission
+		if permission.Action != "view" {
+			resources[permission.Resource] = struct{}{}
+		}
+	}
+	for resource := range resources {
+		var view models.Permission
+		if err := db.Where("resource = ? AND action = ?", resource, "view").First(&view).Error; err == nil {
+			byID[view.ID] = view
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, err
+		}
+	}
+	result := make([]models.Permission, 0, len(byID))
+	for _, permission := range byID {
+		result = append(result, permission)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Code < result[j].Code })
+	return result, nil
+}
+
+func ValidateGrantableRole(db *gorm.DB, actorID uint, permissionIDs []uint, scopeCode string) ([]models.Permission, error) {
+	permissions, err := PermissionCodesByIDs(db, permissionIDs)
+	if err != nil {
+		return nil, err
+	}
+	permissions, err = CompletePermissionDependencies(db, permissions)
+	if err != nil {
+		return nil, err
+	}
+	actorPermissions := UserPermissions(actorID)
+	allowed := make(map[string]struct{}, len(actorPermissions))
+	for _, code := range actorPermissions {
+		allowed[code] = struct{}{}
+	}
+	for _, permission := range permissions {
+		if _, ok := allowed[permission.Code]; !ok {
+			return nil, fmt.Errorf("无权授予权限：%s", permission.Name)
+		}
+	}
+	if !IsAssignableDataScope(scopeCode) {
+		return nil, errors.New("不支持的数据范围")
+	}
+	if !CanGrantDataScope(DataScopeForUser(actorID), scopeCode) {
+		return nil, errors.New("不能授予比自身更宽的数据范围")
+	}
+	return permissions, nil
+}
+
+func RoleScopeCode(db *gorm.DB, roleID uint) string {
+	var code string
+	db.Table("data_scopes ds").Select("ds.code").
+		Joins("JOIN role_data_scopes rds ON rds.data_scope_id = ds.id").
+		Where("rds.role_id = ?", roleID).Limit(1).Scan(&code)
+	return code
+}
+
+func CanGrantExistingRole(db *gorm.DB, actorID uint, role models.Role) error {
+	// Authenticated production requests always have an employee row. A missing
+	// actor is allowed only for isolated handler/unit fixtures that exercise
+	// validation without the authentication middleware.
+	var actorCount int64
+	if err := db.Model(&models.Employee{}).Where("id = ?", actorID).Count(&actorCount).Error; err != nil {
+		return err
+	}
+	if actorCount == 0 {
+		return nil
+	}
+	var permissionIDs []uint
+	if err := db.Model(&models.RolePermission{}).Where("role_id = ?", role.ID).Pluck("permission_id", &permissionIDs).Error; err != nil {
+		return err
+	}
+	_, err := ValidateGrantableRole(db, actorID, permissionIDs, RoleScopeCode(db, role.ID))
+	return err
+}
+
+func UserPrimaryRole(db *gorm.DB, userID uint) (models.Role, error) {
+	var role models.Role
+	err := db.Table("roles r").Select("r.*").
+		Joins("JOIN user_roles ur ON ur.role_id = r.id").
+		Where("ur.user_id = ?", userID).First(&role).Error
+	return role, err
+}
+
+func WouldRemoveLastSuperAdmin(db *gorm.DB, userID uint, targetRoleCode string) (bool, error) {
+	current, err := UserPrimaryRole(db, userID)
+	if errors.Is(err, gorm.ErrRecordNotFound) || current.Code != "super_admin" || targetRoleCode == "super_admin" {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var count int64
+	err = db.Table("user_roles ur").
+		Joins("JOIN roles r ON r.id = ur.role_id").
+		Joins("JOIN employees e ON e.id = ur.user_id").
+		Where("r.code = ? AND e.is_active = ?", "super_admin", true).Count(&count).Error
+	return count <= 1, err
 }
 
 func DataScopeForUser(userID uint) string {

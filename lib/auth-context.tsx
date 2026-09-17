@@ -3,7 +3,6 @@
 import { createContext, useContext, useEffect, useState } from "react"
 import { authApi, LoginRequest, RegisterRequest, type AuthUser } from "@/lib/api"
 import { useDootaskContext } from "./dootask-context"
-import { normalizeRoleCode } from "./access-control"
 
 interface AuthContextType {
   user: AuthUser | null
@@ -130,9 +129,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     refreshUser,
 
     // 角色判断
-    isHR: normalizeRoleCode(user?.role || "") === "hr_admin",
-    isManager: normalizeRoleCode(user?.role || "") === "department_manager",
-    isEmployee: normalizeRoleCode(user?.role || "") === "employee",
+	isHR: !!user?.permissions?.includes("assessment:approve"),
+	isManager:
+	  !user?.permissions?.includes("assessment:approve") &&
+	  !!user?.permissions?.includes("assessment:review") &&
+	  ["DIRECT_SUBORDINATES", "DEPARTMENT", "DEPARTMENT_TREE"].includes(user?.data_scope || ""),
+	isEmployee:
+	  !user?.permissions?.includes("assessment:approve") &&
+	  !(
+		user?.permissions?.includes("assessment:review") &&
+		["DIRECT_SUBORDINATES", "DEPARTMENT", "DEPARTMENT_TREE"].includes(user?.data_scope || "")
+	  ),
     hasPermission: (permission: string) => !!user?.permissions?.includes(permission),
   }
 

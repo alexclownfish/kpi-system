@@ -36,19 +36,22 @@ import {
   LineChart as LineChartIcon,
   Calendar,
   Download,
+  FileSignature,
 } from "lucide-react"
-import { statisticsApi, exportApi, type DashboardStats, type StatisticsResponse } from "@/lib/api"
+import { statisticsApi, exportApi, type DashboardStats, type StatisticsResponse, type SignoffStatistics } from "@/lib/api"
 import { getPeriodValue, formatScore } from "@/lib/utils"
 import { useAppContext } from "@/lib/app-context"
 import { LoadingInline } from "@/components/loading"
 import { useNotification } from "@/lib/notification-context"
 import { downloadUrl } from "@dootask/tools"
+import { toast } from "sonner"
 
 export default function StatisticsPage() {
   const { getStatusBadge } = useAppContext()
   const { onMessage } = useNotification()
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
   const [statisticsData, setStatisticsData] = useState<StatisticsResponse | null>(null)
+  const [signoffData, setSignoffData] = useState<SignoffStatistics | null>(null)
   const [loading, setLoading] = useState(true)
   // 获取默认时间信息
   const getDefaultPeriodInfo = useCallback((period: string) => {
@@ -122,13 +125,15 @@ export default function StatisticsPage() {
         quarter: selectedPeriod === "quarterly" ? selectedQuarter.toString() : undefined,
       }
 
-      const [dashboardResponse, statisticsResponse] = await Promise.all([
+      const [dashboardResponse, statisticsResponse, signoffResponse] = await Promise.all([
         statisticsApi.getDashboard(filterParams),
         statisticsApi.getData(filterParams),
+        statisticsApi.getSignoffs(filterParams),
       ])
 
       setDashboardStats(dashboardResponse.data)
       setStatisticsData(statisticsResponse.data)
+      setSignoffData(signoffResponse.data)
     } catch (error) {
       console.error("获取统计数据失败:", error)
     } finally {
@@ -165,7 +170,7 @@ export default function StatisticsPage() {
       }
 
       // 显示成功消息
-      console.log(response.message)
+      toast.success(response.message)
     } catch (error) {
       console.error("导出失败:", error)
     }
@@ -326,6 +331,7 @@ export default function StatisticsPage() {
           <TabsTrigger value="trends">趋势分析</TabsTrigger>
           <TabsTrigger value="distribution">分数分布</TabsTrigger>
           <TabsTrigger value="performance">绩效排名</TabsTrigger>
+          <TabsTrigger value="signoffs">签字回收</TabsTrigger>
         </TabsList>
 
         <TabsContent value="departments" className="space-y-4">
@@ -498,6 +504,34 @@ export default function StatisticsPage() {
                         <TableCell>{performer.evaluations}</TableCell>
                       </TableRow>
                     ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="signoffs" className="space-y-4">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">应回收</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{signoffData?.summary.total || 0}</CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">在线确认</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{signoffData?.summary.online || 0}</CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">纸质回收</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{signoffData?.summary.paper || 0}</CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">未回收</CardTitle></CardHeader><CardContent className="text-2xl font-bold text-orange-600">{signoffData?.summary.pending || 0}</CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardTitle className="text-sm">回收率</CardTitle></CardHeader><CardContent className="text-2xl font-bold">{(signoffData?.summary.recovery_rate || 0).toFixed(1)}%</CardContent></Card>
+          </div>
+          <Card>
+            <CardHeader><CardTitle className="flex items-center"><FileSignature className="w-5 h-5 mr-2" />签字回收明细</CardTitle></CardHeader>
+            <CardContent>
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader><TableRow><TableHead>员工</TableHead><TableHead>部门</TableHead><TableHead>周期</TableHead><TableHead>总分</TableHead><TableHead>确认方式</TableHead><TableHead>确认时间</TableHead><TableHead>经办人</TableHead></TableRow></TableHeader>
+                  <TableBody>
+                    {(signoffData?.items || []).length === 0 && <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-6">当前筛选条件下暂无待签字结果</TableCell></TableRow>}
+                    {(signoffData?.items || []).map(item => <TableRow key={item.evaluation_id}>
+                      <TableCell className="font-medium">{item.employee}</TableCell><TableCell>{item.department}</TableCell><TableCell>{item.period}</TableCell><TableCell>{formatScore(item.total_score)}</TableCell>
+                      <TableCell>{item.method === "online" ? "在线确认" : item.method === "paper" ? "纸质回收" : "未回收"}</TableCell>
+                      <TableCell>{item.confirmed_at ? new Date(item.confirmed_at).toLocaleString() : "-"}</TableCell><TableCell>{item.handler || "-"}</TableCell>
+                    </TableRow>)}
                   </TableBody>
                 </Table>
               </div>

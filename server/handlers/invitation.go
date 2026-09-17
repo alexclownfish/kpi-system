@@ -36,15 +36,8 @@ func CreateInvitation(c *gin.Context) {
 	}
 	inviterID := currentUserID.(uint)
 
-	// 验证当前用户是否是HR
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, inviterID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
-	if currentUser.Role != "hr" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "只有HR可以发起邀请"})
+	if !UserHasPermission(inviterID, "review:create") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权发起评分邀请"})
 		return
 	}
 
@@ -192,13 +185,6 @@ func GetEvaluationInvitations(c *gin.Context) {
 	}
 	userID := currentUserID.(uint)
 
-	// 验证当前用户
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
 	// 验证评估是否存在且评估对象存在
 	var evaluation models.KPIEvaluation
 	if err := models.DB.Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
@@ -211,8 +197,8 @@ func GetEvaluationInvitations(c *gin.Context) {
 	var invitations []models.EvaluationInvitation
 	query := models.DB.Preload("Invitee").Preload("Inviter")
 
-	if currentUser.Role == "hr" {
-		// HR可以查看所有邀请
+	if UserHasPermission(userID, "review:manage") && CanAccessEvaluation(userID, uint(evalID)) {
+		// 管理评分且处于评估数据范围内的用户可以查看全部邀请
 		query = query.Where("evaluation_id = ?", evalID)
 	} else if evaluation.EmployeeID == userID {
 		// 被评估员工可以查看自己评估的所有邀请
@@ -521,15 +507,9 @@ func GetInvitationScores(c *gin.Context) {
 	}
 
 	// 验证权限：被邀请人、被评估员工或HR可以查看
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
 	// 检查权限：被邀请人、被评估员工或HR可以查看
 	canView := invitation.InviteeID == userID || // 被邀请人
-		currentUser.Role == "hr" || // HR
+		(UserHasPermission(userID, "review:manage") && CanAccessEvaluation(userID, invitation.EvaluationID)) ||
 		invitation.Evaluation.EmployeeID == userID // 被评估员工
 
 	if !canView {
@@ -752,13 +732,7 @@ func GetInvitationDetails(c *gin.Context) {
 	}
 
 	// 验证权限：只有被邀请人或HR可以查看详情
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
-	if invitation.InviteeID != userID && currentUser.Role != "hr" {
+	if invitation.InviteeID != userID && !(UserHasPermission(userID, "review:manage") && CanAccessEvaluation(userID, invitation.EvaluationID)) {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权限查看此邀请详情"})
 		return
 	}
@@ -795,15 +769,8 @@ func CancelInvitation(c *gin.Context) {
 	}
 	userID := currentUserID.(uint)
 
-	// 验证用户是否为HR
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
-	if currentUser.Role != "hr" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "只有HR可以撤销邀请"})
+	if !UserHasPermission(userID, "review:manage") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权撤销邀请"})
 		return
 	}
 
@@ -877,15 +844,8 @@ func ReinviteInvitation(c *gin.Context) {
 	}
 	userID := currentUserID.(uint)
 
-	// 验证用户是否为HR
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
-	if currentUser.Role != "hr" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "只有HR可以重新邀请"})
+	if !UserHasPermission(userID, "review:manage") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权重新邀请"})
 		return
 	}
 
@@ -953,15 +913,8 @@ func DeleteInvitation(c *gin.Context) {
 	}
 	userID := currentUserID.(uint)
 
-	// 验证用户是否为HR
-	var currentUser models.Employee
-	if err := models.DB.First(&currentUser, userID).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "用户不存在"})
-		return
-	}
-
-	if currentUser.Role != "hr" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "只有HR可以删除邀请"})
+	if !UserHasPermission(userID, "review:manage") {
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权删除邀请"})
 		return
 	}
 

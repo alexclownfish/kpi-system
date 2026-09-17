@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Database,
   Scale,
+	ShieldCheck,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useEffect, useMemo } from "react"
@@ -77,6 +78,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }: SidebarProps)
         items: [
           { name: "部门管理", href: "/departments", icon: Building, permission: "department:view" },
           { name: "员工管理", href: "/employees", icon: Users, permission: "employee:create" },
+		  { name: "用户角色", href: "/roles", icon: ShieldCheck, permission: "role:view" },
           { name: "KPI 模板", href: "/templates", icon: ClipboardList, permission: "kpi:view" },
           { name: "绩效规则", href: "/performance-rules", icon: Scale, permission: "kpi:edit" },
         ],
@@ -106,7 +108,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }: SidebarProps)
 
   useEffect(() => {
     if (!currentUser) return
-    const restrictedRoots = ["/", "/evaluations", "/invitations", "/statistics", "/departments", "/employees", "/templates", "/performance-rules", "/backup"]
+    const restrictedRoots = ["/", "/evaluations", "/invitations", "/statistics", "/departments", "/employees", "/roles", "/templates", "/performance-rules", "/backup"]
     const currentRoot = restrictedRoots.find(root => root === "/" ? pathname === "/" : pathname === root || pathname.startsWith(`${root}/`))
     if (!currentRoot) return
     const allowed = navigation.flatMap(section => section.items).some(item => item.href === currentRoot)

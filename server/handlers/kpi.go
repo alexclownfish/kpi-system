@@ -485,6 +485,10 @@ func UpdateEvaluation(c *gin.Context) {
 		})
 		return
 	}
+	if evaluation.Status == "completed" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "已完成的考核不能修改"})
+		return
+	}
 
 	var updateData models.KPIEvaluation
 	if err := c.ShouldBindJSON(&updateData); err != nil {
@@ -492,6 +496,10 @@ func UpdateEvaluation(c *gin.Context) {
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
+		return
+	}
+	if updateData.Status == "completed" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请使用最终结果确认接口完成考核"})
 		return
 	}
 
@@ -858,13 +866,6 @@ func GetPendingEvaluations(c *gin.Context) {
 func GetPendingCountEvaluations(c *gin.Context) {
 	userID := c.GetUint("user_id")
 
-	// 获取当前用户信息，用于根据角色计算待处理数量
-	var user models.Employee
-	if err := models.DB.First(&user, userID).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取用户信息失败"})
-		return
-	}
-
 	var totalCount int64
 
 	// 所有角色：自己的待自评 + 待确认
@@ -875,12 +876,11 @@ func GetPendingCountEvaluations(c *gin.Context) {
 		return
 	}
 
-	// 主管：增加部门内员工的 self_evaluated（待主管评估）
-	if user.Role == "manager" {
+	// 具备评分权限的用户：增加其数据范围内的待评分记录。
+	if UserHasPermission(userID, "assessment:review") {
 		var deptSelfEvaluatedCount int64
-		if err := models.DB.Model(&models.KPIEvaluation{}).
-			Joins("JOIN employees ON employees.id = kpi_evaluations.employee_id").
-			Where("employees.department_id = ? AND kpi_evaluations.status = ?", user.DepartmentID, "self_evaluated").
+		if err := ApplyEvaluationScope(models.DB.Model(&models.KPIEvaluation{}), userID).
+			Where("kpi_evaluations.employee_id <> ? AND kpi_evaluations.status = ?", userID, "self_evaluated").
 			Count(&deptSelfEvaluatedCount).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取待确认评估数量失败"})
 			return
@@ -888,26 +888,16 @@ func GetPendingCountEvaluations(c *gin.Context) {
 		totalCount += deptSelfEvaluatedCount
 	}
 
-	// HR：增加所有 manager_evaluated（待HR审核）+ 部门内员工的 self_evaluated
-	if user.Role == "hr" {
+	// 具备审核权限的用户：增加其数据范围内的待审核记录。
+	if UserHasPermission(userID, "assessment:approve") {
 		var managerEvaluatedCount int64
-		if err := models.DB.Model(&models.KPIEvaluation{}).
-			Where("status = ?", "manager_evaluated").
+		if err := ApplyEvaluationScope(models.DB.Model(&models.KPIEvaluation{}), userID).
+			Where("kpi_evaluations.status = ?", "manager_evaluated").
 			Count(&managerEvaluatedCount).Error; err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取待确认评估数量失败"})
 			return
 		}
 		totalCount += managerEvaluatedCount
-
-		var deptSelfEvaluatedCount int64
-		if err := models.DB.Model(&models.KPIEvaluation{}).
-			Joins("JOIN employees ON employees.id = kpi_evaluations.employee_id").
-			Where("employees.department_id = ? AND kpi_evaluations.status = ?", user.DepartmentID, "self_evaluated").
-			Count(&deptSelfEvaluatedCount).Error; err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "获取待确认评估数量失败"})
-			return
-		}
-		totalCount += deptSelfEvaluatedCount
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -963,6 +953,10 @@ func UpdateSelfScore(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "评分记录不存在",
 		})
+		return
+	}
+	if err := ensureEvaluationNotCompleted(score.EvaluationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -1033,6 +1027,10 @@ func UpdateManagerScore(c *gin.Context) {
 		})
 		return
 	}
+	if err := ensureEvaluationNotCompleted(score.EvaluationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var updateData struct {
 		ManagerScore   *float64 `json:"manager_score"`
@@ -1089,6 +1087,10 @@ func UpdateHRScore(c *gin.Context) {
 		})
 		return
 	}
+	if err := ensureEvaluationNotCompleted(score.EvaluationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
 
 	var updateData struct {
 		HRScore   *float64 `json:"hr_score"`
@@ -1143,6 +1145,10 @@ func UpdateFinalScore(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "评分记录不存在",
 		})
+		return
+	}
+	if err := ensureEvaluationNotCompleted(score.EvaluationID); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 

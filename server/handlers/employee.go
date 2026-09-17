@@ -180,13 +180,14 @@ func CreateEmployee(c *gin.Context) {
 		}
 		employee.Password = string(hashedPassword)
 	}
-	if employee.Role == "employee" && (employee.ManagerID == nil || *employee.ManagerID == 0) {
+	requiresManager := role.RequiresManager || role.Code == "employee"
+	if requiresManager && (employee.ManagerID == nil || *employee.ManagerID == 0) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "普通员工必须选择直属上级",
+			"error": "该角色要求必须选择直属上级",
 		})
 		return
 	}
-	if employee.Role == "employee" {
+	if requiresManager {
 		if validationError := validateManagerAssignment(employee.ManagerID, employee.DepartmentID); validationError != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
 			return
@@ -201,6 +202,10 @@ func CreateEmployee(c *gin.Context) {
 	}
 	if duplicateCount > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "该邮箱已被使用，请更换邮箱"})
+		return
+	}
+	if err := CanGrantExistingRole(models.DB, actorID(c), role); err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -315,27 +320,55 @@ func UpdateEmployee(c *gin.Context) {
 			return
 		}
 	}
+	if LegacyRoleCode(employee.Role) == "super_admin" && employee.IsActive && !updateData.IsActive {
+		if last, err := WouldRemoveLastSuperAdmin(models.DB, employee.ID, ""); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "检查超级管理员保护失败"})
+			return
+		} else if last {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "不能停用最后一个有效超级管理员"})
+			return
+		}
+	}
 
 	targetRole := updateData.Role
 	if targetRole == "" {
 		targetRole = employee.Role
+	}
+	var targetRoleRecord models.Role
+	if err := models.DB.Where("code = ?", LegacyRoleCode(targetRole)).First(&targetRoleRecord).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "角色不存在"})
+		return
+	}
+	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
+		if err := CanGrantExistingRole(models.DB, actorID(c), targetRoleRecord); err != nil {
+			c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+			return
+		}
+		if last, err := WouldRemoveLastSuperAdmin(models.DB, employee.ID, targetRoleRecord.Code); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "检查超级管理员保护失败"})
+			return
+		} else if last {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "不能改派最后一个有效超级管理员"})
+			return
+		}
 	}
 	targetDepartmentID := updateData.DepartmentID
 	if targetDepartmentID == 0 {
 		targetDepartmentID = employee.DepartmentID
 	}
 	targetManagerID := updateData.ManagerID
-	if targetRole == "employee" && targetManagerID == nil {
+	targetRequiresManager := targetRoleRecord.RequiresManager || targetRoleRecord.Code == "employee"
+	if targetRequiresManager && targetManagerID == nil {
 		targetManagerID = employee.ManagerID
 	}
 
-	if targetRole == "employee" && (targetManagerID == nil || *targetManagerID == 0) {
+	if targetRequiresManager && (targetManagerID == nil || *targetManagerID == 0) {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "普通员工必须选择直属上级",
+			"error": "该角色要求必须选择直属上级",
 		})
 		return
 	}
-	if LegacyRoleValue(targetRole) == "employee" {
+	if targetRequiresManager {
 		if validationError := validateManagerAssignment(targetManagerID, targetDepartmentID); validationError != "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
 			return
@@ -414,6 +447,9 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 	RecordAudit(c, "update_employee", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS")
+	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
+		RecordAuditDetails(c, "assign_role", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS", "role="+LegacyRoleCode(updateData.Role))
+	}
 	if updateData.Password != "" {
 		RecordAudit(c, "reset_password", "employee", strconv.FormatUint(employeeId, 10), "SUCCESS")
 	}
@@ -461,6 +497,13 @@ func DeleteEmployee(c *gin.Context) {
 	}
 	if LegacyRoleCode(employee.Role) == "super_admin" && !HasPermission(c, "role:edit") {
 		c.JSON(http.StatusForbidden, gin.H{"error": "只有超级管理员可以删除超级管理员"})
+		return
+	}
+	if last, err := WouldRemoveLastSuperAdmin(models.DB, uint(employeeId), ""); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查超级管理员保护失败"})
+		return
+	} else if last {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "不能删除最后一个有效超级管理员"})
 		return
 	}
 

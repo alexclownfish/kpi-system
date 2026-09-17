@@ -16,7 +16,7 @@ import { useAuth } from "@/lib/auth-context"
 import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { getRoleLabel, normalizeRoleCode, roleRequiresManager } from "@/lib/access-control"
+import { getRoleLabel, normalizeRoleCode } from "@/lib/access-control"
 import axios from "axios"
 
 export default function EmployeesPage() {
@@ -113,8 +113,8 @@ export default function EmployeesPage() {
     try {
       const response = await employeeApi.getAll({
         department_id: departmentId,
-        role: "manager,hr",
         pageSize: 100, // 获取该部门所有上级
+		is_active: true,
       })
       const departmentManagers = response.data || []
       // 如果是编辑模式，排除当前编辑的员工
@@ -151,25 +151,30 @@ export default function EmployeesPage() {
     }
   }, [])
 
+  const selectedRoleRequiresManager = useMemo(() => {
+    const role = roles.find(item => item.code === normalizeRoleCode(formData.role))
+    return role?.requires_manager ?? normalizeRoleCode(formData.role) === "employee"
+  }, [formData.role, roles])
+
   useEffect(() => {
-    if (!roleRequiresManager(formData.role) && supervisors.length === 0) {
+    if (!selectedRoleRequiresManager && supervisors.length === 0) {
       fetchSupervisors()
     }
-  }, [formData.role, supervisors.length, fetchSupervisors])
+  }, [selectedRoleRequiresManager, supervisors.length, fetchSupervisors])
 
   const supervisorOptions = useMemo(() => {
-    if (!roleRequiresManager(formData.role)) {
+    if (!selectedRoleRequiresManager) {
       return supervisors.filter(emp => (editingEmployee ? emp.id !== editingEmployee.id : true))
     }
     return managers
-  }, [formData.role, supervisors, managers, editingEmployee])
+  }, [selectedRoleRequiresManager, supervisors, managers, editingEmployee])
 
   const managerSelectValue = useMemo(() => {
-    if (!roleRequiresManager(formData.role)) {
+    if (!selectedRoleRequiresManager) {
       return formData.manager_id || "none"
     }
     return formData.manager_id
-  }, [formData.manager_id, formData.role])
+  }, [formData.manager_id, selectedRoleRequiresManager])
 
   // 创建或更新员工
   const handleSubmit = async (e: React.FormEvent) => {
@@ -180,8 +185,8 @@ export default function EmployeesPage() {
         return
       }
 
-      if (roleRequiresManager(formData.role) && !formData.manager_id) {
-        await Alert("验证失败", "普通员工必须选择直属上级，请先选择上级后再提交。")
+      if (selectedRoleRequiresManager && !formData.manager_id) {
+		await Alert("验证失败", "该角色要求必须选择直属上级，请先选择上级后再提交。")
         return
       }
 
@@ -287,10 +292,10 @@ export default function EmployeesPage() {
   const getRoleBadge = (role: string) => {
     const code = normalizeRoleCode(role)
     const variant = code === "super_admin" ? "destructive" : code === "employee" ? "outline" : "secondary"
-    return <Badge variant={variant}>{getRoleLabel(code)}</Badge>
+    return <Badge variant={variant}>{roles.find(item => item.code === code)?.name || getRoleLabel(code)}</Badge>
   }
 
-  const assignableRoles = roles.filter(role => role.code !== "super_admin" || canManageSystemRoles)
+  const assignableRoles = roles.filter(role => role.assignable !== false && (role.code !== "super_admin" || canManageSystemRoles))
 
   return (
     <div className="space-y-6">
@@ -413,7 +418,7 @@ export default function EmployeesPage() {
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="manager">
                     直属上级
-                    {roleRequiresManager(formData.role)
+                    {selectedRoleRequiresManager
                       ? "（必选）"
                       : "（可选，可指定任一员工或无上级）"}
                   </Label>
@@ -424,21 +429,21 @@ export default function EmployeesPage() {
                     <SelectTrigger>
                       <SelectValue
                         placeholder={
-                          roleRequiresManager(formData.role)
+                          selectedRoleRequiresManager
                             ? "选择直属上级（必选）"
                             : "选择任一员工作为上级或无上级"
                         }
                       />
                     </SelectTrigger>
                     <SelectContent>
-                      {!roleRequiresManager(formData.role) && (
+                      {!selectedRoleRequiresManager && (
                         <SelectItem value="none">
                           无上级
                         </SelectItem>
                       )}
                       {supervisorOptions.length === 0 && (
                         <SelectItem value="none-disabled" disabled>
-                          {roleRequiresManager(formData.role) ? "暂无可选上级" : "暂无可选员工"}
+                          {selectedRoleRequiresManager ? "暂无可选上级" : "暂无可选员工"}
                         </SelectItem>
                       )}
                       {supervisorOptions.map(manager => {

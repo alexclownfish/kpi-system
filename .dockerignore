@@ -8,3 +8,5 @@ coverage/
 *.log*
 .env*
 kpi-main/
+server/uploads/
+uploads/

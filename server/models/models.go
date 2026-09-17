@@ -6,14 +6,15 @@ import (
 
 // Role represents a business role. Code is stable and used by permission checks.
 type Role struct {
-	ID          uint         `json:"id" gorm:"primaryKey"`
-	Code        string       `json:"code" gorm:"uniqueIndex;not null"`
-	Name        string       `json:"name" gorm:"not null"`
-	Description string       `json:"description"`
-	IsSystem    bool         `json:"is_system" gorm:"default:true"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	Permissions []Permission `json:"permissions,omitempty" gorm:"many2many:role_permissions"`
+	ID              uint         `json:"id" gorm:"primaryKey"`
+	Code            string       `json:"code" gorm:"uniqueIndex;not null"`
+	Name            string       `json:"name" gorm:"not null"`
+	Description     string       `json:"description"`
+	IsSystem        bool         `json:"is_system" gorm:"default:false"`
+	RequiresManager bool         `json:"requires_manager" gorm:"default:false"`
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
+	Permissions     []Permission `json:"permissions,omitempty" gorm:"many2many:role_permissions"`
 }
 
 // Permission is a resource/action capability, for example employee:view.
@@ -30,7 +31,7 @@ type Permission struct {
 
 type UserRole struct {
 	UserID    uint      `json:"user_id" gorm:"primaryKey"`
-	RoleID    uint      `json:"role_id" gorm:"primaryKey"`
+	RoleID    uint      `json:"role_id" gorm:"primaryKey;index"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
@@ -49,7 +50,7 @@ type DataScope struct {
 
 type RoleDataScope struct {
 	RoleID      uint      `json:"role_id" gorm:"primaryKey"`
-	DataScopeID uint      `json:"data_scope_id" gorm:"primaryKey"`
+	DataScopeID uint      `json:"data_scope_id" gorm:"primaryKey;index"`
 	CreatedAt   time.Time `json:"created_at"`
 }
 
@@ -148,6 +149,56 @@ type KPIEvaluation struct {
 	Employee Employee    `json:"employee,omitempty" gorm:"foreignKey:EmployeeID"`
 	Template KPITemplate `json:"template,omitempty" gorm:"foreignKey:TemplateID"`
 	Scores   []KPIScore  `json:"scores,omitempty" gorm:"foreignKey:EvaluationID"`
+}
+
+// EvaluationResultSnapshot is an immutable, checksummed version of a finalized
+// evaluation result used for exports and sign-off evidence.
+type EvaluationResultSnapshot struct {
+	ID           uint      `json:"id" gorm:"primaryKey"`
+	EvaluationID uint      `json:"evaluation_id" gorm:"not null;uniqueIndex:idx_evaluation_snapshot_version;uniqueIndex:idx_evaluation_snapshot_checksum"`
+	Version      int       `json:"version" gorm:"not null;uniqueIndex:idx_evaluation_snapshot_version"`
+	SnapshotJSON string    `json:"-" gorm:"type:text;not null"`
+	Checksum     string    `json:"checksum" gorm:"size:64;not null;uniqueIndex:idx_evaluation_snapshot_checksum"`
+	CreatedBy    uint      `json:"created_by" gorm:"not null"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+// EvaluationConfirmation records the single effective final confirmation for
+// an evaluation, whether completed online or by archived paper signature.
+type EvaluationConfirmation struct {
+	ID                     uint                     `json:"id" gorm:"primaryKey"`
+	EvaluationID           uint                     `json:"evaluation_id" gorm:"not null;uniqueIndex"`
+	SnapshotID             uint                     `json:"snapshot_id" gorm:"not null;uniqueIndex"`
+	Method                 string                   `json:"method" gorm:"size:16;not null"`
+	ConfirmedBy            uint                     `json:"confirmed_by" gorm:"not null"`
+	ConfirmedAt            time.Time                `json:"confirmed_at" gorm:"not null"`
+	SignedAt               *time.Time               `json:"signed_at,omitempty"`
+	HandledBy              *uint                    `json:"handled_by,omitempty"`
+	AttachmentStoredName   string                   `json:"-"`
+	AttachmentOriginalName string                   `json:"attachment_name,omitempty"`
+	AttachmentContentType  string                   `json:"attachment_content_type,omitempty"`
+	AttachmentSize         int64                    `json:"attachment_size,omitempty"`
+	Remark                 string                   `json:"remark" gorm:"size:500"`
+	CreatedAt              time.Time                `json:"created_at"`
+	UpdatedAt              time.Time                `json:"updated_at"`
+	Snapshot               EvaluationResultSnapshot `json:"snapshot" gorm:"foreignKey:SnapshotID"`
+	Confirmer              Employee                 `json:"confirmer,omitempty" gorm:"foreignKey:ConfirmedBy"`
+	Handler                *Employee                `json:"handler,omitempty" gorm:"foreignKey:HandledBy"`
+}
+
+// FinalScoreImportBatch stores a server-validated preview so commit requests
+// cannot replace the reviewed workbook contents with client supplied data.
+type FinalScoreImportBatch struct {
+	ID          string     `json:"id" gorm:"primaryKey;size:36"`
+	CreatedBy   uint       `json:"created_by" gorm:"not null;index"`
+	FileName    string     `json:"file_name" gorm:"not null"`
+	Status      string     `json:"status" gorm:"size:16;not null;index"`
+	PayloadJSON string     `json:"-" gorm:"type:text;not null"`
+	SummaryJSON string     `json:"-" gorm:"type:text;not null"`
+	ExpiresAt   time.Time  `json:"expires_at" gorm:"not null;index"`
+	CommittedAt *time.Time `json:"committed_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // KPI具体得分模型

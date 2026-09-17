@@ -63,7 +63,15 @@ func SetupRoutes(r *gin.RouterGroup) {
 		// 当前用户信息
 		protected.GET("/me", handlers.GetCurrentUser)
 		protected.GET("/roles", handlers.PermissionAnyMiddleware("employee:assign_role", "role:view"), handlers.GetRoles)
+		protected.GET("/roles/:id", handlers.PermissionMiddleware("role:view"), handlers.GetRole)
+		protected.POST("/roles", handlers.PermissionMiddleware("role:create"), handlers.CreateRole)
+		protected.POST("/roles/:id/clone", handlers.PermissionMiddleware("role:create"), handlers.CloneRole)
+		protected.PUT("/roles/:id", handlers.PermissionMiddleware("role:edit"), handlers.UpdateRole)
+		protected.DELETE("/roles/:id", handlers.PermissionMiddleware("role:delete"), handlers.DeleteRole)
+		protected.GET("/roles/:id/users", handlers.PermissionMiddleware("role:view"), handlers.GetRoleUsers)
+		protected.PUT("/roles/:id/users", handlers.PermissionMiddleware("employee:assign_role"), handlers.AssignRoleUsers)
 		protected.GET("/permissions", handlers.PermissionMiddleware("role:view"), handlers.GetPermissions)
+		protected.GET("/data-scopes", handlers.PermissionMiddleware("role:view"), handlers.GetDataScopes)
 
 		// 部门管理（HR和管理员）
 		departmentRoutes := protected.Group("/departments")
@@ -140,6 +148,12 @@ func SetupRoutes(r *gin.RouterGroup) {
 			// 异议处理
 			evaluationRoutes.POST("/:id/objection", handlers.SubmitObjection) // 员工提交异议
 			evaluationRoutes.PUT("/:id/objection/handle", handlers.PermissionMiddleware("assessment:approve"), handlers.HandleObjection)
+
+			// 最终结果确认与纸质签字归档
+			evaluationRoutes.GET("/:id/confirmation", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluationConfirmation)
+			evaluationRoutes.POST("/:id/confirm-online", handlers.PermissionMiddleware("assessment:submit"), handlers.ConfirmEvaluationOnline)
+			evaluationRoutes.POST("/:id/confirm-paper", handlers.PermissionMiddleware("assessment:approve"), handlers.ConfirmEvaluationPaper)
+			evaluationRoutes.GET("/:id/confirmation/attachment", handlers.PermissionMiddleware("assessment:view"), handlers.DownloadConfirmationAttachment)
 		}
 
 		// 邀请评分管理
@@ -182,6 +196,16 @@ func SetupRoutes(r *gin.RouterGroup) {
 			statsRoutes.GET("/employee/:id", handlers.PermissionAnyMiddleware("report:personal", "report:department", "report:company"), handlers.GetEmployeeStats)
 			statsRoutes.GET("/trends", handlers.PermissionMiddleware("report:company"), handlers.GetTrends)
 			statsRoutes.GET("/data", handlers.PermissionMiddleware("report:company"), handlers.GetStatisticsData)
+			statsRoutes.GET("/signoffs", handlers.PermissionMiddleware("report:export"), handlers.GetSignoffStatistics)
+		}
+
+		// 最终评分批量导入（HR/绩效管理员）
+		finalScoreRoutes := protected.Group("/final-scores")
+		finalScoreRoutes.Use(handlers.PermissionMiddleware("assessment:approve"))
+		{
+			finalScoreRoutes.GET("/import-template", handlers.ExportFinalScoreImportTemplate)
+			finalScoreRoutes.POST("/import/preview", handlers.PreviewFinalScoreImport)
+			finalScoreRoutes.POST("/import/:batchId/commit", handlers.CommitFinalScoreImport)
 		}
 
 		// 导出功能（管理员和HR）
@@ -189,6 +213,7 @@ func SetupRoutes(r *gin.RouterGroup) {
 		exportRoutes.Use(handlers.PermissionMiddleware("report:export"))
 		{
 			exportRoutes.GET("/evaluation/:id", handlers.ExportEvaluationToExcel)
+			exportRoutes.GET("/signoff-batch", handlers.ExportSignoffBatch)
 			exportRoutes.GET("/department/:id", handlers.ExportDepartmentToExcel)
 			exportRoutes.GET("/period/:period", handlers.ExportPeriodToExcel)
 		}

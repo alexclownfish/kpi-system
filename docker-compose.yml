@@ -8,10 +8,13 @@ services:
     volumes:
       - kpi-db:/app/db
       - kpi-exports:/app/exports
+      - kpi-signoffs:/app/uploads/evaluation-confirmations
     environment:
       - SYSTEM_MODE=standalone
       - GIN_MODE=release
       - JWT_SECRET=${JWT_SECRET:-please-change-this-secret-in-production}
+      - SIGNOFF_UPLOAD_DIR=/app/uploads/evaluation-confirmations
+      - BOOTSTRAP_SUPER_ADMIN_EMAIL=${BOOTSTRAP_SUPER_ADMIN_EMAIL:-}
     ports:
       - "13808:8080"
 
@@ -44,3 +47,4 @@ services:
 volumes:
   kpi-db:
   kpi-exports:
+  kpi-signoffs:

@@ -1,8 +1,10 @@
 package models
 
 import (
+	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
@@ -44,6 +46,9 @@ func InitDB() {
 		&KPIItem{},
 		&KPIEvaluation{},
 		&KPIScore{},
+		&EvaluationResultSnapshot{},
+		&EvaluationConfirmation{},
+		&FinalScoreImportBatch{},
 		&EvaluationComment{},
 		&EvaluationInvitation{},
 		&InvitedScore{},
@@ -54,6 +59,8 @@ func InitDB() {
 		log.Fatal("数据库迁移失败:", err)
 	}
 	seedAccessControl()
+	repairAccessControlConstraints()
+	bootstrapSuperAdmin()
 
 	log.Println("数据库表迁移完成")
 }
@@ -62,9 +69,9 @@ func InitDB() {
 // can be migrated from Employee.Role without changing existing records.
 func seedAccessControl() {
 	roles := []Role{
-		{Code: "super_admin", Name: "超级管理员"}, {Code: "hr_admin", Name: "HR管理员"},
-		{Code: "performance_admin", Name: "绩效专员"}, {Code: "department_manager", Name: "部门负责人"},
-		{Code: "reviewer", Name: "评审人"}, {Code: "analyst", Name: "数据分析员"}, {Code: "employee", Name: "普通员工"},
+		{Code: "super_admin", Name: "超级管理员", IsSystem: true}, {Code: "hr_admin", Name: "HR管理员", IsSystem: true},
+		{Code: "performance_admin", Name: "绩效专员", IsSystem: true}, {Code: "department_manager", Name: "部门负责人", IsSystem: true},
+		{Code: "reviewer", Name: "评审人", IsSystem: true}, {Code: "analyst", Name: "数据分析员", IsSystem: true}, {Code: "employee", Name: "普通员工", IsSystem: true},
 	}
 	permissions := []Permission{
 		{Code: "user:view", Name: "查看用户", Resource: "user", Action: "view"}, {Code: "user:create", Name: "创建用户", Resource: "user", Action: "create"}, {Code: "user:edit", Name: "编辑用户", Resource: "user", Action: "edit"}, {Code: "user:disable", Name: "停用用户", Resource: "user", Action: "disable"},
@@ -79,6 +86,8 @@ func seedAccessControl() {
 	for _, role := range roles {
 		DB.Where("code = ?", role.Code).FirstOrCreate(&role, Role{Code: role.Code})
 	}
+	DB.Model(&Role{}).Where("code IN ?", []string{"super_admin", "hr_admin", "performance_admin", "department_manager", "reviewer", "analyst", "employee"}).Update("is_system", true)
+	DB.Model(&Role{}).Where("code = ?", "employee").Update("requires_manager", true)
 	for _, permission := range permissions {
 		DB.Where("code = ?", permission.Code).FirstOrCreate(&permission, Permission{Code: permission.Code})
 	}
@@ -114,6 +123,109 @@ func seedAccessControl() {
 			DB.Where("role_id = ? AND data_scope_id = ?", role.ID, scope.ID).FirstOrCreate(&RoleDataScope{RoleID: role.ID, DataScopeID: scope.ID})
 		}
 	}
+}
+
+// repairAccessControlConstraints keeps legacy data while enforcing the MVP's
+// single-role and single-data-scope invariants. It is safe to run on every boot.
+func repairAccessControlConstraints() {
+	var users []uint
+	DB.Model(&UserRole{}).Select("user_id").Group("user_id").Having("COUNT(*) > 1").Pluck("user_id", &users)
+	for _, userID := range users {
+		var employee Employee
+		var bindings []UserRole
+		DB.Where("user_id = ?", userID).Order("created_at, role_id").Find(&bindings)
+		keepRoleID := uint(0)
+		if DB.Select("role").First(&employee, userID).Error == nil {
+			var role Role
+			if DB.Where("code = ?", normalizeSeedRoleCode(employee.Role)).First(&role).Error == nil {
+				keepRoleID = role.ID
+			}
+		}
+		if keepRoleID == 0 && len(bindings) > 0 {
+			keepRoleID = bindings[0].RoleID
+		}
+		DB.Where("user_id = ? AND role_id <> ?", userID, keepRoleID).Delete(&UserRole{})
+	}
+
+	var roleIDs []uint
+	DB.Model(&RoleDataScope{}).Select("role_id").Group("role_id").Having("COUNT(*) > 1").Pluck("role_id", &roleIDs)
+	for _, roleID := range roleIDs {
+		var bindings []RoleDataScope
+		DB.Where("role_id = ?", roleID).Order("created_at, data_scope_id").Find(&bindings)
+		if len(bindings) > 0 {
+			DB.Where("role_id = ? AND data_scope_id <> ?", roleID, bindings[0].DataScopeID).Delete(&RoleDataScope{})
+		}
+	}
+
+	if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_roles_one_role_per_user ON user_roles(user_id)").Error; err != nil {
+		log.Printf("创建用户唯一角色约束失败: %v", err)
+	}
+	if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_role_data_scopes_one_scope_per_role ON role_data_scopes(role_id)").Error; err != nil {
+		log.Printf("创建角色唯一数据范围约束失败: %v", err)
+	}
+}
+
+func normalizeSeedRoleCode(role string) string {
+	switch role {
+	case "hr":
+		return "hr_admin"
+	case "manager":
+		return "department_manager"
+	case "":
+		return "employee"
+	default:
+		return role
+	}
+}
+
+// bootstrapSuperAdmin provides an explicit, owner-controlled recovery path for
+// deployments that predate the super_admin role. It never promotes anyone
+// unless BOOTSTRAP_SUPER_ADMIN_EMAIL is deliberately configured.
+func bootstrapSuperAdmin() {
+	var activeCount int64
+	if err := DB.Table("user_roles ur").
+		Joins("JOIN roles r ON r.id = ur.role_id").
+		Joins("JOIN employees e ON e.id = ur.user_id").
+		Where("r.code = ? AND e.is_active = ?", "super_admin", true).
+		Count(&activeCount).Error; err != nil {
+		log.Printf("检查超级管理员状态失败: %v", err)
+		return
+	}
+	if activeCount > 0 {
+		return
+	}
+	email := strings.TrimSpace(os.Getenv("BOOTSTRAP_SUPER_ADMIN_EMAIL"))
+	if email == "" {
+		log.Println("警告：当前没有有效超级管理员；如需初始化，请显式设置 BOOTSTRAP_SUPER_ADMIN_EMAIL 后重启后端")
+		return
+	}
+	var employee Employee
+	if err := DB.Where("LOWER(email) = LOWER(?) AND is_active = ?", email, true).First(&employee).Error; err != nil {
+		log.Printf("超级管理员初始化失败：未找到指定的在职账号 %q", email)
+		return
+	}
+	var role Role
+	if err := DB.Where("code = ?", "super_admin").First(&role).Error; err != nil {
+		log.Printf("超级管理员初始化失败：系统角色不存在: %v", err)
+		return
+	}
+	err := DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id = ?", employee.ID).Delete(&UserRole{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&UserRole{UserID: employee.ID, RoleID: role.ID}).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&Employee{}).Where("id = ?", employee.ID).Update("role", "super_admin").Error; err != nil {
+			return err
+		}
+		return tx.Create(&AuditLog{UserID: employee.ID, Action: "bootstrap_super_admin", Resource: "role", ResourceID: fmt.Sprint(role.ID), Result: "SUCCESS", Details: "email=" + employee.Email}).Error
+	})
+	if err != nil {
+		log.Printf("超级管理员初始化失败: %v", err)
+		return
+	}
+	log.Printf("已按显式配置将账号 %q 初始化为超级管理员；建议移除 BOOTSTRAP_SUPER_ADMIN_EMAIL", employee.Email)
 }
 
 // 创建测试数据

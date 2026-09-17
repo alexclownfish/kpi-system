@@ -31,6 +31,9 @@ import {
   Loader2,
   XCircle,
   Zap,
+  Download,
+  Upload,
+  FileSignature,
 } from "lucide-react"
 import {
   evaluationApi,
@@ -40,6 +43,8 @@ import {
   invitationApi,
   performanceRuleApi,
   employeeApi,
+  exportApi,
+  finalScoreImportApi,
   type KPIEvaluation,
   type KPIScore,
   type KPITemplate,
@@ -51,6 +56,8 @@ import {
   type EvaluationPaginatedResponse,
   type EvaluationStats,
   type PerformanceRule,
+  type EvaluationConfirmation,
+  type FinalScoreImportPreview,
 } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { useAppContext } from "@/lib/app-context"
@@ -62,6 +69,7 @@ import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { downloadUrl } from "@dootask/tools"
 
 // 计算上个月和对应年份的函数
 const getLastMonth = () => {
@@ -81,7 +89,7 @@ const getLastMonth = () => {
 export default function EvaluationsPage() {
   const { Alert, Confirm, getStatusBadge, isTouch } = useAppContext()
   const { refreshUnreadEvaluations } = useUnreadContext()
-  const { user: currentUser, isManager, isHR } = useAuth()
+  const { user: currentUser, isManager, isHR, hasPermission } = useAuth()
   const { onMessage } = useNotification()
   const detailsRef = useRef<HTMLDivElement>(null)
 
@@ -102,6 +110,18 @@ export default function EvaluationsPage() {
 
   const [isSubmittingSelfEvaluation, setIsSubmittingSelfEvaluation] = useState(false)
   const [isSubmittingObjection, setIsSubmittingObjection] = useState(false)
+  const [confirmation, setConfirmation] = useState<EvaluationConfirmation | null>(null)
+  const [paperDialogOpen, setPaperDialogOpen] = useState(false)
+  const [paperSignedAt, setPaperSignedAt] = useState("")
+  const [paperRemark, setPaperRemark] = useState("")
+  const [paperFile, setPaperFile] = useState<File | null>(null)
+  const [isExportingResult, setIsExportingResult] = useState(false)
+  const [isConfirmingResult, setIsConfirmingResult] = useState(false)
+  const [isSubmittingPaper, setIsSubmittingPaper] = useState(false)
+  const [batchDialogOpen, setBatchDialogOpen] = useState(false)
+  const [batchFile, setBatchFile] = useState<File | null>(null)
+  const [batchPreview, setBatchPreview] = useState<FinalScoreImportPreview | null>(null)
+  const [batchBusy, setBatchBusy] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
@@ -170,6 +190,12 @@ export default function EvaluationsPage() {
   }) // 邀请表单
   
   const lastMonthData = getLastMonth()
+  const [batchFilter, setBatchFilter] = useState({
+    period: "monthly",
+    year: lastMonthData.year,
+    month: lastMonthData.month,
+    quarter: Math.floor((lastMonthData.month - 1) / 3) + 1,
+  })
   const [formData, setFormData] = useState({
     employee_ids: [] as string[],
     template_id: "",
@@ -1179,18 +1205,26 @@ export default function EvaluationsPage() {
 
     // 员工最后确认最终得分
     if (stage === "confirm") {
-      // 检查是否所有项目都已确认最终得分
-      const alreadyConfirmed = scores.find(score => !isUnknown(score.final_score))
-      if (alreadyConfirmed) {
-        Alert("确认最终得分", "已确认最终得分，无法再修改。")
-        return
-      }
-
-      // 确认最终得分
       const result = await Confirm("确认最终得分", "确定要确认最终得分吗？确认后将无法再修改。")
       if (!result) {
         return
       }
+
+      try {
+        setIsConfirmingResult(true)
+        const response = await evaluationApi.confirmOnline(evaluationId)
+        setConfirmation(response.data)
+        setSelectedEvaluation(response.evaluation)
+        await fetchEvaluationScores(evaluationId)
+        fetchEvaluations()
+        refreshUnreadEvaluations()
+        await Alert("确认最终得分", "最终得分确认成功！绩效评估已正式结束。")
+      } catch (error) {
+        await Alert("提交失败", getErrorMessage(error, "确认最终得分失败，请重试。"))
+      } finally {
+        setIsConfirmingResult(false)
+      }
+      return
     }
 
     try {
@@ -1554,11 +1588,159 @@ export default function EvaluationsPage() {
     }
   }
 
+  const fetchConfirmation = async (evaluationId: number) => {
+    try {
+      const response = await evaluationApi.getConfirmation(evaluationId)
+      setConfirmation(response.data)
+    } catch (error) {
+      console.error("获取确认记录失败:", error)
+      setConfirmation(null)
+    }
+  }
+
+  const handleExportResult = async () => {
+    if (!selectedEvaluation) return
+    try {
+      setIsExportingResult(true)
+      const response = await exportApi.evaluation(selectedEvaluation.id)
+      try {
+        await downloadUrl(response.file_url)
+      } catch {
+        window.open(response.file_url, "_blank")
+      }
+      toast.success(`最终评分表导出成功${response.result_version ? `（V${response.result_version}）` : ""}`)
+    } catch (error) {
+      await Alert("导出失败", getErrorMessage(error, "最终评分表导出失败，请重试"))
+    } finally {
+      setIsExportingResult(false)
+    }
+  }
+
+  const handlePaperConfirmation = async () => {
+    if (!selectedEvaluation || !paperFile || !paperSignedAt) {
+      await Alert("表单验证", "请选择签字日期并上传签字材料。")
+      return
+    }
+    if (paperFile.size > 10 * 1024 * 1024) {
+      await Alert("文件过大", "签字材料不能超过10MB。")
+      return
+    }
+    try {
+      setIsSubmittingPaper(true)
+      const response = await evaluationApi.confirmPaper(selectedEvaluation.id, {
+        signedAt: paperSignedAt,
+        remark: paperRemark,
+        file: paperFile,
+      })
+      setConfirmation(response.data)
+      setSelectedEvaluation(response.evaluation)
+      setPaperDialogOpen(false)
+      setPaperFile(null)
+      setPaperRemark("")
+      fetchEvaluations()
+      await fetchEvaluationScores(selectedEvaluation.id)
+      await Alert("登记成功", "纸质签字材料已归档，绩效考核已完成。")
+    } catch (error) {
+      await Alert("登记失败", getErrorMessage(error, "纸质签字登记失败，请重试"))
+    } finally {
+      setIsSubmittingPaper(false)
+    }
+  }
+
+  const handleDownloadSignoff = async () => {
+    if (!selectedEvaluation || !confirmation?.attachment_name) return
+    try {
+      const blob = await evaluationApi.downloadConfirmationAttachment(selectedEvaluation.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = confirmation.attachment_name
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      await Alert("下载失败", getErrorMessage(error, "签字材料下载失败"))
+    }
+  }
+
+  const getBatchParams = () => ({
+    year: batchFilter.year.toString(),
+    period: batchFilter.period,
+    month: batchFilter.period === "monthly" ? batchFilter.month.toString() : undefined,
+    quarter: batchFilter.period === "quarterly" ? batchFilter.quarter.toString() : undefined,
+  })
+
+  const downloadExport = async (response: { file_url: string }) => {
+    try {
+      await downloadUrl(response.file_url)
+    } catch {
+      window.open(response.file_url, "_blank")
+    }
+  }
+
+  const handleDownloadImportTemplate = async () => {
+    try {
+      setBatchBusy(true)
+      await downloadExport(await finalScoreImportApi.template(getBatchParams()))
+      toast.success("最终评分导入模板已生成")
+    } catch (error) {
+      await Alert("模板下载失败", getErrorMessage(error, "没有可导入的待确认考核，或模板生成失败"))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handlePreviewImport = async () => {
+    if (!batchFile) {
+      await Alert("请选择文件", "请选择填写后的 .xlsx 导入文件。")
+      return
+    }
+    try {
+      setBatchBusy(true)
+      setBatchPreview(await finalScoreImportApi.preview(batchFile))
+      toast.success("预检完成，请核对错误明细后提交")
+    } catch (error) {
+      await Alert("预检失败", getErrorMessage(error, "导入文件预检失败"))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handleCommitImport = async () => {
+    if (!batchPreview) return
+    try {
+      setBatchBusy(true)
+      const response = await finalScoreImportApi.commit(batchPreview.batch_id)
+      toast.success(`导入完成：成功 ${response.summary.succeeded} 条考核，失败 ${response.summary.failed} 条`)
+      setBatchPreview(null)
+      setBatchFile(null)
+      await fetchEvaluations()
+    } catch (error) {
+      await Alert("提交失败", getErrorMessage(error, "最终评分提交失败，请重新预检"))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handleBatchSignoffExport = async () => {
+    try {
+      setBatchBusy(true)
+      const response = await exportApi.signoffBatch(getBatchParams())
+      await downloadExport(response)
+      toast.success(response.message)
+    } catch (error) {
+      await Alert("批量导出失败", getErrorMessage(error, "签字表 ZIP 生成失败"))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
   // 查看详情
   const handleViewDetails = useCallback(
     (evaluation: KPIEvaluation) => {
       setSelectedEvaluation(evaluation)
+      setConfirmation(null)
       fetchEvaluationScores(evaluation.id)
+      fetchConfirmation(evaluation.id)
       setScoreDialogOpen(true)
       setActiveTab("details")
 
@@ -1682,7 +1864,7 @@ export default function EvaluationsPage() {
         if (
           evaluation.status === "self_evaluated" &&
           evaluation.employee_id === currentUser.id &&
-          evaluation.employee?.role === "hr" &&
+		  hasPermission("assessment:approve") &&
           !evaluation.employee?.manager_id
         ) {
           return true
@@ -1784,6 +1966,10 @@ export default function EvaluationsPage() {
         </div>
         {isHR && (
           <div className="flex flex-wrap gap-2 w-full sm:w-auto lg:mt-8">
+            <Button variant="outline" className="w-full sm:w-auto" onClick={() => setBatchDialogOpen(true)}>
+              <FileSignature className="w-4 h-4 mr-2" />
+              批量结果处理
+            </Button>
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button className="w-full sm:w-auto">
@@ -1911,6 +2097,89 @@ export default function EvaluationsPage() {
                 </Button>
               </DialogFooter>
             </DialogContent>
+            </Dialog>
+            <Dialog open={batchDialogOpen} onOpenChange={setBatchDialogOpen}>
+              <DialogContent className="w-[95vw] sm:max-w-4xl mx-auto">
+                <DialogHeader>
+                  <DialogTitle>批量最终评分与签字表</DialogTitle>
+                </DialogHeader>
+                <DialogBody className="space-y-5">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                    <div className="space-y-2">
+                      <Label>周期</Label>
+                      <Select value={batchFilter.period} onValueChange={period => setBatchFilter(prev => ({ ...prev, period }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="monthly">月度</SelectItem>
+                          <SelectItem value="quarterly">季度</SelectItem>
+                          <SelectItem value="yearly">年度</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>年份</Label>
+                      <Select value={batchFilter.year.toString()} onValueChange={year => setBatchFilter(prev => ({ ...prev, year: Number(year) }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Array.from({ length: 10 }, (_, index) => new Date().getFullYear() - index).map(year => <SelectItem key={year} value={year.toString()}>{year}年</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>
+                    {batchFilter.period === "monthly" && <div className="space-y-2">
+                      <Label>月份</Label>
+                      <Select value={batchFilter.month.toString()} onValueChange={month => setBatchFilter(prev => ({ ...prev, month: Number(month) }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{Array.from({ length: 12 }, (_, index) => index + 1).map(month => <SelectItem key={month} value={month.toString()}>{month}月</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>}
+                    {batchFilter.period === "quarterly" && <div className="space-y-2">
+                      <Label>季度</Label>
+                      <Select value={batchFilter.quarter.toString()} onValueChange={quarter => setBatchFilter(prev => ({ ...prev, quarter: Number(quarter) }))}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>{[1, 2, 3, 4].map(quarter => <SelectItem key={quarter} value={quarter.toString()}>第{quarter}季度</SelectItem>)}</SelectContent>
+                      </Select>
+                    </div>}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" disabled={batchBusy} onClick={handleDownloadImportTemplate}>
+                      <Download className="w-4 h-4 mr-2" />下载导入模板
+                    </Button>
+                    <Button type="button" variant="outline" disabled={batchBusy} onClick={handleBatchSignoffExport}>
+                      <FileSignature className="w-4 h-4 mr-2" />批量导出签字 PDF
+                    </Button>
+                  </div>
+                  <div className="rounded-md border p-4 space-y-3">
+                    <Label htmlFor="final-score-import">上传填写后的模板（.xlsx，最大 10MB）</Label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Input id="final-score-import" type="file" accept=".xlsx" onChange={event => { setBatchFile(event.target.files?.[0] || null); setBatchPreview(null) }} />
+                      <Button type="button" disabled={batchBusy || !batchFile} onClick={handlePreviewImport}>
+                        {batchBusy ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}预检
+                      </Button>
+                    </div>
+                  </div>
+                  {batchPreview && <div className="space-y-3">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                      <Card><CardContent className="pt-4">总行数：<strong>{batchPreview.summary.total_rows}</strong></CardContent></Card>
+                      <Card><CardContent className="pt-4 text-green-700">有效考核：<strong>{batchPreview.summary.valid_evaluations}</strong></CardContent></Card>
+                      <Card><CardContent className="pt-4 text-red-700">错误考核：<strong>{batchPreview.summary.invalid_evaluations}</strong></CardContent></Card>
+                      <Card><CardContent className="pt-4">有效至：{new Date(batchPreview.expires_at).toLocaleTimeString()}</CardContent></Card>
+                    </div>
+                    <div className="max-h-72 overflow-auto rounded-md border">
+                      <Table>
+                        <TableHeader><TableRow><TableHead>行</TableHead><TableHead>员工</TableHead><TableHead>指标</TableHead><TableHead>分数</TableHead><TableHead>结果</TableHead></TableRow></TableHeader>
+                        <TableBody>{batchPreview.rows.map(row => <TableRow key={row.row}>
+                          <TableCell>{row.row}</TableCell><TableCell>{row.employee || "-"}</TableCell><TableCell>{row.item || "-"}</TableCell><TableCell>{row.score ?? "-"}</TableCell>
+                          <TableCell className={row.status === "valid" ? "text-green-700" : "text-red-700"}>{row.message}</TableCell>
+                        </TableRow>)}</TableBody>
+                      </Table>
+                    </div>
+                  </div>}
+                </DialogBody>
+                <DialogFooter>
+                  <Button type="button" variant="outline" onClick={() => setBatchDialogOpen(false)}>关闭</Button>
+                  <Button type="button" disabled={batchBusy || !batchPreview || batchPreview.summary.valid_evaluations === 0} onClick={handleCommitImport}>
+                    {batchBusy && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}仅提交有效考核
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
             </Dialog>
             <Button
               variant="outline"
@@ -2325,6 +2594,37 @@ export default function EvaluationsPage() {
                     })()}
                   </div>
                 </div>
+
+                {confirmation && (
+                  <Card className="border-green-200 dark:border-green-800">
+                    <CardContent className="p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 font-medium text-green-700 dark:text-green-300">
+                            <FileSignature className="w-4 h-4" />
+                            最终结果已{confirmation.method === "paper" ? "纸质签字确认" : "在线确认"}
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            结果版本 V{confirmation.snapshot.version} · 确认时间{" "}
+                            {new Date(confirmation.confirmed_at).toLocaleString("zh-CN")}
+                          </p>
+                          {confirmation.signed_at && (
+                            <p className="text-sm text-muted-foreground">
+                              签字日期 {new Date(confirmation.signed_at).toLocaleDateString("zh-CN")}
+                              {confirmation.handler?.name ? ` · 经办人 ${confirmation.handler.name}` : ""}
+                            </p>
+                          )}
+                          {confirmation.remark && <p className="text-sm whitespace-pre-wrap">{confirmation.remark}</p>}
+                        </div>
+                        {confirmation.attachment_name && (
+                          <Button variant="outline" size="sm" onClick={handleDownloadSignoff}>
+                            <Download className="w-4 h-4 mr-1" /> 下载签字材料
+                          </Button>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
 
                 {/* 标签页 */}
                 <Tabs
@@ -3513,6 +3813,28 @@ export default function EvaluationsPage() {
               </DialogBody>
 
               <DialogFooter className="flex-col sm:flex-row justify-end gap-2 sm:space-x-2 sm:gap-0">
+                {["pending_confirm", "completed"].includes(selectedEvaluation.status) &&
+                  hasPermission("report:export") && (
+                    <Button variant="outline" onClick={handleExportResult} disabled={isExportingResult}>
+                      {isExportingResult ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
+                      {isExportingResult ? "导出中..." : "导出最终评分表"}
+                    </Button>
+                  )}
+                {selectedEvaluation.status === "pending_confirm" &&
+                  hasPermission("assessment:approve") &&
+                  !selectedEvaluation.has_objection && (
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setPaperSignedAt(new Date().toISOString().slice(0, 10))
+                        setPaperRemark("")
+                        setPaperFile(null)
+                        setPaperDialogOpen(true)
+                      }}
+                    >
+                      <Upload className="w-4 h-4 mr-1" /> 登记纸质签字
+                    </Button>
+                  )}
                 {canPerformAction(selectedEvaluation, "self") && (
                   <Button
                     onClick={() => handleCompleteStage(selectedEvaluation.id, "self")}
@@ -3542,8 +3864,9 @@ export default function EvaluationsPage() {
                     <Button
                       onClick={() => handleCompleteStage(selectedEvaluation.id, "confirm")}
                       className="w-full sm:w-auto"
+                      disabled={isConfirmingResult}
                     >
-                      确认最终得分
+                      {isConfirmingResult ? "确认中..." : "确认最终得分"}
                     </Button>
                   )}
                   {canPerformAction(selectedEvaluation, "submitObjection") && (
@@ -3581,6 +3904,48 @@ export default function EvaluationsPage() {
               </DialogFooter>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={paperDialogOpen} onOpenChange={setPaperDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>登记纸质签字</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4 py-4">
+            <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+              请先导出当前最终评分表并完成员工签字。上传材料必须与最新导出版本一致。
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paper-signed-at">签字日期</Label>
+              <Input id="paper-signed-at" type="date" value={paperSignedAt} onChange={e => setPaperSignedAt(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paper-file">签字材料（PDF/JPG/PNG，最大10MB）</Label>
+              <Input
+                id="paper-file"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={e => setPaperFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="paper-remark">备注</Label>
+              <Textarea
+                id="paper-remark"
+                value={paperRemark}
+                maxLength={500}
+                onChange={e => setPaperRemark(e.target.value)}
+                placeholder="可填写纸质材料编号或保留意见"
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter className="justify-end gap-2">
+            <Button variant="outline" onClick={() => setPaperDialogOpen(false)} disabled={isSubmittingPaper}>取消</Button>
+            <Button onClick={handlePaperConfirmation} disabled={isSubmittingPaper || !paperFile || !paperSignedAt}>
+              {isSubmittingPaper ? "提交中..." : "确认归档并完成考核"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

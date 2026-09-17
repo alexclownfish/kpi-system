@@ -48,10 +48,12 @@ func formatPeriodDisplay(period string, year int, month *int, quarter *int) stri
 
 // 导出响应结构
 type ExportResponse struct {
-	FileURL  string `json:"file_url"`
-	FileName string `json:"file_name"`
-	FileSize int64  `json:"file_size"`
-	Message  string `json:"message"`
+	FileURL      string `json:"file_url"`
+	FileName     string `json:"file_name"`
+	FileSize     int64  `json:"file_size"`
+	Message      string `json:"message"`
+	ResultVersion int    `json:"result_version,omitempty"`
+	Checksum     string `json:"checksum,omitempty"`
 }
 
 // 导出评估报告为Excel
@@ -66,11 +68,20 @@ func ExportEvaluationToExcel(c *gin.Context) {
 	}
 
 	var evaluation models.KPIEvaluation
-	result := models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores.Item").First(&evaluation, evaluationId)
+	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Employee.Manager").Preload("Template").Preload("Scores.Item"), c.GetUint("user_id")).First(&evaluation, evaluationId)
 	if result.Error != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "评估不存在",
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "评估不存在或超出数据范围",
 		})
+		return
+	}
+	if evaluation.Status != "pending_confirm" && evaluation.Status != "completed" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "最终结果尚未定稿，暂不能导出签字表"})
+		return
+	}
+	snapshot, _, err := GetOrCreateResultSnapshot(models.DB, evaluation.ID, c.GetUint("user_id"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成结果版本失败"})
 		return
 	}
 
@@ -86,7 +97,7 @@ func ExportEvaluationToExcel(c *gin.Context) {
 	f.SetSheetName("Sheet1", sheetName)
 
 	// 设置标题
-	f.SetCellValue(sheetName, "A1", "绩效考核评估报告")
+	f.SetCellValue(sheetName, "A1", "绩效考核结果确认表")
 	f.MergeCell(sheetName, "A1", "G1")
 
 	// 设置标题样式
@@ -122,6 +133,11 @@ func ExportEvaluationToExcel(c *gin.Context) {
 	f.SetCellValue(sheetName, "B"+strconv.Itoa(row), evaluation.TotalScore)
 	f.SetCellValue(sheetName, "D"+strconv.Itoa(row), "状态:")
 	f.SetCellValue(sheetName, "E"+strconv.Itoa(row), getStatusText(evaluation.Status))
+	row++
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row), "结果版本:")
+	f.SetCellValue(sheetName, "B"+strconv.Itoa(row), fmt.Sprintf("V%d", snapshot.Version))
+	f.SetCellValue(sheetName, "D"+strconv.Itoa(row), "校验码:")
+	f.SetCellValue(sheetName, "E"+strconv.Itoa(row), snapshot.Checksum[:16])
 
 	// 设置表头
 	row += 2
@@ -169,9 +185,7 @@ func ExportEvaluationToExcel(c *gin.Context) {
 		}
 		f.SetCellValue(sheetName, "F"+strconv.Itoa(row), score.ManagerComment)
 
-		if score.FinalScore != nil {
-			f.SetCellValue(sheetName, "G"+strconv.Itoa(row), *score.FinalScore)
-		}
+		f.SetCellValue(sheetName, "G"+strconv.Itoa(row), effectiveFinalScore(score))
 
 		// 设置数据行样式
 		dataStyle, _ := f.NewStyle(&excelize.Style{
@@ -198,6 +212,21 @@ func ExportEvaluationToExcel(c *gin.Context) {
 		f.MergeCell(sheetName, "A"+strconv.Itoa(row), "G"+strconv.Itoa(row+2))
 	}
 
+	row += 4
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row), "员工确认意见：")
+	f.MergeCell(sheetName, "B"+strconv.Itoa(row), "G"+strconv.Itoa(row+1))
+	row += 3
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row), "员工签字：________________")
+	f.SetCellValue(sheetName, "D"+strconv.Itoa(row), "直属主管签字：________________")
+	row += 2
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row), "HR签字：________________")
+	f.SetCellValue(sheetName, "D"+strconv.Itoa(row), "签字日期：______年____月____日")
+	row += 2
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row), fmt.Sprintf("考核编号：KPI-%06d", evaluation.ID))
+	f.SetCellValue(sheetName, "D"+strconv.Itoa(row), "导出时间："+time.Now().Format("2006-01-02 15:04"))
+	f.SetCellValue(sheetName, "A"+strconv.Itoa(row+1), "完整校验码："+snapshot.Checksum)
+	f.MergeCell(sheetName, "A"+strconv.Itoa(row+1), "G"+strconv.Itoa(row+1))
+
 	// 设置列宽
 	f.SetColWidth(sheetName, "A", "A", 20)
 	f.SetColWidth(sheetName, "B", "B", 10)
@@ -206,6 +235,17 @@ func ExportEvaluationToExcel(c *gin.Context) {
 	f.SetColWidth(sheetName, "E", "E", 10)
 	f.SetColWidth(sheetName, "F", "F", 25)
 	f.SetColWidth(sheetName, "G", "G", 10)
+	landscape := "landscape"
+	fitWidth, fitHeight, paperSize := 1, 0, 9
+	fitToPage := true
+	_ = f.SetSheetProps(sheetName, &excelize.SheetPropsOptions{FitToPage: &fitToPage})
+	_ = f.SetPageLayout(sheetName, &excelize.PageLayoutOptions{Orientation: &landscape, Size: &paperSize, FitToWidth: &fitWidth, FitToHeight: &fitHeight})
+	_ = f.SetDefinedName(&excelize.DefinedName{
+		Name:     "_xlnm.Print_Area",
+		RefersTo: fmt.Sprintf("'%s'!$A$1:$G$%d", sheetName, row+1),
+		Scope:    sheetName,
+	})
+	_ = f.SetHeaderFooter(sheetName, &excelize.HeaderFooterOptions{OddFooter: "第 &P 页，共 &N 页"})
 
 	// 创建公共导出目录
 	if err := os.MkdirAll(ExportDir, 0755); err != nil {
@@ -248,10 +288,8 @@ func ExportEvaluationToExcel(c *gin.Context) {
 	downloadURL := utils.GetFileURL(c.GetString("base_url"), fmt.Sprintf("/api/download/exports/%s", randomKey))
 
 	c.JSON(http.StatusOK, ExportResponse{
-		FileURL:  downloadURL,
-		FileName: fileName,
-		FileSize: fileInfo.Size(),
-		Message:  "导出成功",
+		FileURL: downloadURL, FileName: fileName, FileSize: fileInfo.Size(), Message: "导出成功",
+		ResultVersion: snapshot.Version, Checksum: snapshot.Checksum,
 	})
 
 	// 30分钟后删除文件
