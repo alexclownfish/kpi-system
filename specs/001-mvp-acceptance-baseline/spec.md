@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-17
 
-**Status**: Draft
+**Status**: Approved for implementation
 
 **Input**: User description: "为现有 KPI MVP 建立可重复、可定位失败且不污染持久化数据的验收与回归基线。"
 

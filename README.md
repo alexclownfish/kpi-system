@@ -73,7 +73,7 @@ dootask-kpi/
 
 ## 🔐 用户角色
 
-系统支持三种用户角色：
+系统使用 Role → Permission → Data Scope 模型，预置七种系统角色：
 
 ### 👤 普通员工 (employee)
 - 查看和填写自己的绩效考核
@@ -98,6 +98,43 @@ dootask-kpi/
 - 处理员工异议申请
 - 系统设置配置
 - 数据统计分析
+
+### 🛡️ 超级管理员 (super_admin)
+- 管理系统角色、权限与超级管理员账号
+- 拥有全部数据范围；高风险操作写入审计记录
+
+### 📋 绩效专员 (performance_admin)
+- 管理 KPI 模板、考核任务、审核与绩效流程
+- 不自动获得系统角色管理能力
+
+### 🧑‍⚖️ 评审人 (reviewer)
+- 查看并处理被分配的邀请评分任务
+- 数据范围为 `ASSIGNED`
+
+### 📈 数据分析员 (analyst)
+- 查看公司级统计与报表
+- 不具备员工、角色或系统配置写权限
+
+规范角色代码为 `super_admin`、`hr_admin`、`performance_admin`、`department_manager`、
+`reviewer`、`analyst`、`employee`。历史员工字段中的 `hr`、`manager` 会在登录和授权时规范化。
+常用数据范围包括 `SELF`、`DIRECT_SUBORDINATES`、`DEPARTMENT`、`ASSIGNED` 和 `ALL`；
+`DEPARTMENT_TREE` 当前仍按本部门处理，尚未实现真实递归部门树。
+
+## ✅ MVP 一键验收
+
+Docker 服务启动后，设置本地 HR 验收密码并运行：
+
+```bash
+export KPI_BASE_URL=http://localhost
+export KPI_TEST_HR_EMAIL=sunba@company.com
+export KPI_TEST_HR_PASSWORD='本地验收密码'
+npm run acceptance:mvp
+```
+
+验收覆盖统一入口、健康状态、HR 认证、页面创建普通员工、负责人创建、初始密码登录、
+权限拒绝、`SELF`/`DEPARTMENT` 数据隔离、秘密脱敏和精确 ID 清理。脱敏 HTML 与 JSON 报告位于
+`.artifacts/acceptance-result.html` 和 `.artifacts/acceptance-result.json`。脚本不会删除 Compose 卷；
+日常停止服务使用 `docker compose down`，不要添加 `-v`。
 
 ## 📊 考核流程
 

@@ -312,7 +312,7 @@ export default function EmployeesPage() {
               <DialogTitle>{editingEmployee ? "编辑员工" : "添加员工"}</DialogTitle>
             </DialogHeader>
             <DialogBody>
-              <form id="employee-form" onSubmit={handleSubmit} className="space-y-4">
+              <form id="employee-form" onSubmit={handleSubmit} className="space-y-4" aria-busy={submitting}>
                 <div className="flex flex-col gap-2">
                   <Label htmlFor="name">姓名</Label>
                   <Input
@@ -489,7 +489,7 @@ export default function EmployeesPage() {
               >
                 取消
               </Button>
-              <Button type="submit" form="employee-form" className="w-full sm:w-auto" disabled={submitting}>
+              <Button type="submit" form="employee-form" className="w-full sm:w-auto" disabled={submitting} data-testid="employee-submit">
                 {submitting ? "提交中..." : editingEmployee ? "更新" : "创建"}
               </Button>
             </DialogFooter>

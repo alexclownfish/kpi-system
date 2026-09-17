@@ -70,6 +70,7 @@ const AlertLayout = forwardRef<AlertLayoutRef, AlertLayoutProps>(
     return (
       <AlertDialog open={!!currentAlert} onOpenChange={handleClose}>
         <AlertDialogContent
+          data-testid="app-alert"
           onEscapeKeyDown={e => {
             e.preventDefault()
           }}

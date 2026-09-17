@@ -10,9 +10,9 @@ import (
 
 	"dootask-kpi-server/models"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"golang.org/x/crypto/bcrypt"
 )
 
 func setupPermissionDB(t *testing.T) {
@@ -85,6 +85,66 @@ func TestCreateEmployeeAcceptsAndHashesInitialPassword(t *testing.T) {
 	}
 }
 
+func TestCreateEmployeeRejectsInvalidInputsWithoutCreatingRecords(t *testing.T) {
+	setupPermissionDB(t)
+	gin.SetMode(gin.TestMode)
+	deptA := models.Department{Name: "研发部"}
+	deptB := models.Department{Name: "销售部"}
+	models.DB.Create(&deptA)
+	models.DB.Create(&deptB)
+	employeeRole := models.Role{Code: "employee", Name: "普通员工"}
+	models.DB.Create(&employeeRole)
+	activeManager := models.Employee{Name: "在职主管", Email: "active-manager@test", Password: "hash", Role: "manager", DepartmentID: deptA.ID, IsActive: true}
+	inactiveManager := models.Employee{Name: "离职主管", Email: "inactive-manager@test", Password: "hash", Role: "manager", DepartmentID: deptA.ID, IsActive: false}
+	otherManager := models.Employee{Name: "外部主管", Email: "other-manager@test", Password: "hash", Role: "manager", DepartmentID: deptB.ID, IsActive: true}
+	existing := models.Employee{Name: "已有员工", Email: "duplicate@test", Password: "hash", Role: "employee", DepartmentID: deptA.ID, ManagerID: &activeManager.ID, IsActive: true}
+	models.DB.Create(&activeManager)
+	models.DB.Create(&inactiveManager)
+	models.DB.Model(&inactiveManager).Update("is_active", false)
+	inactiveManager.IsActive = false
+	models.DB.Create(&otherManager)
+	existing.ManagerID = &activeManager.ID
+	models.DB.Create(&existing)
+
+	r := gin.New()
+	r.POST("/employees", func(c *gin.Context) {
+		c.Set("user_id", uint(1))
+		c.Next()
+	}, CreateEmployee)
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+		wantError  string
+	}{
+		{"missing password", fmt.Sprintf(`{"name":"无密码","email":"missing-password@test","position":"开发","department_id":%d,"manager_id":%d,"role":"employee","is_active":true}`, deptA.ID, activeManager.ID), http.StatusBadRequest, "初始密码"},
+		{"missing manager", fmt.Sprintf(`{"name":"无上级","email":"missing-manager@test","password":"12345678","position":"开发","department_id":%d,"role":"employee","is_active":true}`, deptA.ID), http.StatusBadRequest, "直属上级"},
+		{"inactive manager", fmt.Sprintf(`{"name":"离职上级","email":"inactive@test","password":"12345678","position":"开发","department_id":%d,"manager_id":%d,"role":"employee","is_active":true}`, deptA.ID, inactiveManager.ID), http.StatusBadRequest, "已停用"},
+		{"manager in another department", fmt.Sprintf(`{"name":"跨部门","email":"wrong-dept@test","password":"12345678","position":"开发","department_id":%d,"manager_id":%d,"role":"employee","is_active":true}`, deptA.ID, otherManager.ID), http.StatusBadRequest, "不属于所选部门"},
+		{"duplicate email", fmt.Sprintf(`{"name":"重复邮箱","email":"DUPLICATE@test","password":"12345678","position":"开发","department_id":%d,"manager_id":%d,"role":"employee","is_active":true}`, deptA.ID, activeManager.ID), http.StatusConflict, "邮箱已被使用"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var before int64
+			models.DB.Model(&models.Employee{}).Count(&before)
+			req := httptest.NewRequest(http.MethodPost, "/employees", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			r.ServeHTTP(response, req)
+			if response.Code != tt.wantStatus || !strings.Contains(response.Body.String(), tt.wantError) {
+				t.Fatalf("status=%d body=%s, want status=%d error containing %q", response.Code, response.Body.String(), tt.wantStatus, tt.wantError)
+			}
+			var after int64
+			models.DB.Model(&models.Employee{}).Count(&after)
+			if after != before {
+				t.Fatalf("invalid request created a record: before=%d after=%d", before, after)
+			}
+		})
+	}
+}
+
 func TestProtectedPermissionRouteDeniesUnassignedPermission(t *testing.T) {
 	setupPermissionDB(t)
 	gin.SetMode(gin.TestMode)
@@ -109,6 +169,35 @@ func TestProtectedPermissionRouteDeniesUnassignedPermission(t *testing.T) {
 	r.ServeHTTP(response, req)
 	if response.Code != http.StatusForbidden || called {
 		t.Fatalf("status=%d called=%v, want 403 and no handler execution", response.Code, called)
+	}
+}
+
+func TestEmployeeCannotCreateEmployeesOrViewCompanyStatistics(t *testing.T) {
+	setupPermissionDB(t)
+	gin.SetMode(gin.TestMode)
+	user := models.Employee{Name: "员工", Email: "employee-denied@test", Password: "hash", Role: "employee", IsActive: true}
+	role := models.Role{Code: "employee", Name: "普通员工"}
+	models.DB.Create(&user)
+	models.DB.Create(&role)
+	models.DB.Create(&models.UserRole{UserID: user.ID, RoleID: role.ID})
+
+	r := gin.New()
+	r.POST("/employees", func(c *gin.Context) { c.Set("user_id", user.ID) }, PermissionMiddleware("employee:create"), CreateEmployee)
+	r.GET("/statistics/dashboard", func(c *gin.Context) { c.Set("user_id", user.ID) }, PermissionMiddleware("report:company"), func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"total_employees": 999})
+	})
+	for _, request := range []*http.Request{
+		httptest.NewRequest(http.MethodPost, "/employees", strings.NewReader(`{}`)),
+		httptest.NewRequest(http.MethodGet, "/statistics/dashboard", nil),
+	} {
+		response := httptest.NewRecorder()
+		r.ServeHTTP(response, request)
+		if response.Code != http.StatusForbidden {
+			t.Fatalf("%s %s status=%d body=%s, want 403", request.Method, request.URL.Path, response.Code, response.Body.String())
+		}
+		if strings.Contains(response.Body.String(), "total_employees") {
+			t.Fatalf("denial leaked protected statistics: %s", response.Body.String())
+		}
 	}
 }
 

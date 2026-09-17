@@ -7,7 +7,9 @@
     "dev:all": "bash scripts/dev.sh",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "acceptance:mvp": "bash scripts/acceptance/run-mvp.sh"
   },
   "dependencies": {
     "@dootask/tools": "^1.2.5",
@@ -43,6 +45,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/lodash": "^4.17.20",
     "@types/node": "^20",

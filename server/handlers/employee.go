@@ -186,6 +186,23 @@ func CreateEmployee(c *gin.Context) {
 		})
 		return
 	}
+	if employee.Role == "employee" {
+		if validationError := validateManagerAssignment(employee.ManagerID, employee.DepartmentID); validationError != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
+			return
+		}
+	}
+	var duplicateCount int64
+	if err := models.DB.Model(&models.Employee{}).
+		Where("LOWER(email) = LOWER(?)", employee.Email).
+		Count(&duplicateCount).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "检查员工邮箱失败"})
+		return
+	}
+	if duplicateCount > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "该邮箱已被使用，请更换邮箱"})
+		return
+	}
 
 	tx := models.DB.Begin()
 	result := tx.Create(&employee)
@@ -303,6 +320,10 @@ func UpdateEmployee(c *gin.Context) {
 	if targetRole == "" {
 		targetRole = employee.Role
 	}
+	targetDepartmentID := updateData.DepartmentID
+	if targetDepartmentID == 0 {
+		targetDepartmentID = employee.DepartmentID
+	}
 	targetManagerID := updateData.ManagerID
 	if targetRole == "employee" && targetManagerID == nil {
 		targetManagerID = employee.ManagerID
@@ -313,6 +334,12 @@ func UpdateEmployee(c *gin.Context) {
 			"error": "普通员工必须选择直属上级",
 		})
 		return
+	}
+	if LegacyRoleValue(targetRole) == "employee" {
+		if validationError := validateManagerAssignment(targetManagerID, targetDepartmentID); validationError != "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
+			return
+		}
 	}
 
 	// 密码重置属于 HR 管理操作，避免主管通过接口修改员工登录凭据。
@@ -347,7 +374,7 @@ func UpdateEmployee(c *gin.Context) {
 		"name":          updateData.Name,
 		"email":         updateData.Email,
 		"position":      updateData.Position,
-		"department_id": updateData.DepartmentID,
+		"department_id": targetDepartmentID,
 		"manager_id":    managerValue, // 支持 nil 值以清空直属上级
 		"role":          roleValue,
 		"is_active":     updateData.IsActive,
@@ -398,6 +425,23 @@ func UpdateEmployee(c *gin.Context) {
 		"message": "员工更新成功",
 		"data":    employee,
 	})
+}
+
+func validateManagerAssignment(managerID *uint, departmentID uint) string {
+	if managerID == nil || *managerID == 0 {
+		return "普通员工必须选择直属上级"
+	}
+	var manager models.Employee
+	if err := models.DB.Select("id", "department_id", "is_active").First(&manager, *managerID).Error; err != nil {
+		return "直属上级不存在"
+	}
+	if !manager.IsActive {
+		return "直属上级已停用，请选择在职上级"
+	}
+	if manager.DepartmentID != departmentID {
+		return "直属上级不属于所选部门"
+	}
+	return ""
 }
 
 // 删除员工

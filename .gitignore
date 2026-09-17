@@ -12,6 +12,11 @@
 
 # testing
 /coverage
+/playwright-report/
+/test-results/
+/.artifacts/acceptance-*.json
+/.artifacts/cleanup-status.json
+/.artifacts/
 
 # next.js
 /.next/
