@@ -3,48 +3,75 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
-    container_name: kpi-backend
     restart: unless-stopped
     volumes:
       - kpi-db:/app/db
       - kpi-exports:/app/exports
       - kpi-signoffs:/app/uploads/evaluation-confirmations
+      - kpi-backups:/app/backups
+      - ./secrets:/run/kpi-secrets:ro
     environment:
+      - APP_ENV=${APP_ENV:-production}
       - SYSTEM_MODE=standalone
       - GIN_MODE=release
-      - JWT_SECRET=${JWT_SECRET:-please-change-this-secret-in-production}
+      - SEED_DEMO_DATA=${SEED_DEMO_DATA:-false}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET is required; copy .env.example to .env}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS:?CORS_ALLOWED_ORIGINS is required}
       - SIGNOFF_UPLOAD_DIR=/app/uploads/evaluation-confirmations
+      - BACKUP_DIR=/app/backups
+      - BOOTSTRAP_ADMIN_EMAIL=${BOOTSTRAP_ADMIN_EMAIL:-}
+      - BOOTSTRAP_ADMIN_NAME=${BOOTSTRAP_ADMIN_NAME:-}
+      - BOOTSTRAP_ADMIN_PASSWORD_FILE=${BOOTSTRAP_ADMIN_PASSWORD_FILE:-}
       - BOOTSTRAP_SUPER_ADMIN_EMAIL=${BOOTSTRAP_SUPER_ADMIN_EMAIL:-}
-    ports:
-      - "13808:8080"
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD", "/app/kpi-server", "healthcheck"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
-    container_name: kpi-frontend
     restart: unless-stopped
     environment:
       - NODE_ENV=production
-    ports:
-      - "13003:3000"
+    expose:
+      - "3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
   nginx-gateway:
     build:
       context: .
       dockerfile: Dockerfile.nginx
     image: kpi-system-nginx:local
-    container_name: nginx-gateway
     restart: always
     ports:
-      - "80:80"
-      - "443:443"
+      - "${KPI_HTTP_BIND:-0.0.0.0}:${KPI_HTTP_PORT:-80}:80"
     depends_on:
-      - backend
-      - frontend
+      backend:
+        condition: service_healthy
+      frontend:
+        condition: service_started
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
 
 volumes:
   kpi-db:
   kpi-exports:
   kpi-signoffs:
+  kpi-backups:

@@ -35,8 +35,12 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
+# env files（仅提交示例）
 .env*
+!.env.example
+
+# local deployment secrets
+/secrets/
 
 # vercel
 .vercel

@@ -1,8 +1,10 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"log"
+	"net/mail"
 	"os"
 	"strings"
 
@@ -22,8 +24,12 @@ func InitDB() {
 	os.MkdirAll("db", 0755)
 
 	// 连接SQLite数据库
+	logLevel := logger.Info
+	if isProduction() {
+		logLevel = logger.Warn
+	}
 	DB, err = gorm.Open(sqlite.Open("db/kpi.db"), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logger.Default.LogMode(logLevel),
 	})
 	if err != nil {
 		log.Fatal("数据库连接失败:", err)
@@ -60,9 +66,12 @@ func InitDB() {
 	}
 	seedAccessControl()
 	repairAccessControlConstraints()
-	bootstrapSuperAdmin()
 
 	log.Println("数据库表迁移完成")
+}
+
+func isProduction() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
 }
 
 // seedAccessControl creates the stable MVP catalog idempotently. Business data
@@ -178,54 +187,141 @@ func normalizeSeedRoleCode(role string) string {
 	}
 }
 
-// bootstrapSuperAdmin provides an explicit, owner-controlled recovery path for
-// deployments that predate the super_admin role. It never promotes anyone
-// unless BOOTSTRAP_SUPER_ADMIN_EMAIL is deliberately configured.
-func bootstrapSuperAdmin() {
+// BootstrapSuperAdmin provides an explicit, owner-controlled initialization
+// and recovery path. It can create a first owner from BOOTSTRAP_ADMIN_* or
+// promote an existing account through the legacy BOOTSTRAP_SUPER_ADMIN_EMAIL.
+func BootstrapSuperAdmin() error {
 	var activeCount int64
 	if err := DB.Table("user_roles ur").
 		Joins("JOIN roles r ON r.id = ur.role_id").
 		Joins("JOIN employees e ON e.id = ur.user_id").
 		Where("r.code = ? AND e.is_active = ?", "super_admin", true).
 		Count(&activeCount).Error; err != nil {
-		log.Printf("检查超级管理员状态失败: %v", err)
-		return
+		return fmt.Errorf("检查超级管理员状态失败: %w", err)
 	}
 	if activeCount > 0 {
-		return
+		return nil
 	}
-	email := strings.TrimSpace(os.Getenv("BOOTSTRAP_SUPER_ADMIN_EMAIL"))
+
+	email := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_EMAIL"))
 	if email == "" {
-		log.Println("警告：当前没有有效超级管理员；如需初始化，请显式设置 BOOTSTRAP_SUPER_ADMIN_EMAIL 后重启后端")
-		return
+		email = strings.TrimSpace(os.Getenv("BOOTSTRAP_SUPER_ADMIN_EMAIL"))
 	}
+	if email == "" {
+		message := "当前没有有效超级管理员；请设置 BOOTSTRAP_ADMIN_EMAIL、BOOTSTRAP_ADMIN_NAME 和 BOOTSTRAP_ADMIN_PASSWORD_FILE"
+		if isProduction() {
+			return errors.New(message)
+		}
+		log.Println("警告：" + message)
+		return nil
+	}
+	parsedAddress, err := mail.ParseAddress(email)
+	if err != nil || !strings.EqualFold(parsedAddress.Address, email) {
+		return fmt.Errorf("超级管理员初始化邮箱格式无效: %q", email)
+	}
+
 	var employee Employee
-	if err := DB.Where("LOWER(email) = LOWER(?) AND is_active = ?", email, true).First(&employee).Error; err != nil {
-		log.Printf("超级管理员初始化失败：未找到指定的在职账号 %q", email)
-		return
+	lookupErr := DB.Where("LOWER(email) = LOWER(?)", email).First(&employee).Error
+	if lookupErr == nil && !employee.IsActive {
+		return fmt.Errorf("超级管理员初始化失败：指定账号 %q 已停用", email)
 	}
+	if lookupErr != nil && !errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+		return fmt.Errorf("查询超级管理员初始化账号失败: %w", lookupErr)
+	}
+
 	var role Role
 	if err := DB.Where("code = ?", "super_admin").First(&role).Error; err != nil {
-		log.Printf("超级管理员初始化失败：系统角色不存在: %v", err)
-		return
+		return fmt.Errorf("超级管理员初始化失败：系统角色不存在: %w", err)
 	}
-	err := DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("user_id = ?", employee.ID).Delete(&UserRole{}).Error; err != nil {
-			return err
+
+	created := false
+	if errors.Is(lookupErr, gorm.ErrRecordNotFound) {
+		name := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_NAME"))
+		passwordFile := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_PASSWORD_FILE"))
+		if name == "" || passwordFile == "" {
+			return errors.New("创建初始超级管理员需要 BOOTSTRAP_ADMIN_NAME 和 BOOTSTRAP_ADMIN_PASSWORD_FILE")
 		}
-		if err := tx.Create(&UserRole{UserID: employee.ID, RoleID: role.ID}).Error; err != nil {
-			return err
+		passwordBytes, err := os.ReadFile(passwordFile)
+		if err != nil {
+			return fmt.Errorf("读取初始超级管理员密码文件失败: %w", err)
 		}
-		if err := tx.Model(&Employee{}).Where("id = ?", employee.ID).Update("role", "super_admin").Error; err != nil {
-			return err
+		password := strings.TrimSpace(string(passwordBytes))
+		if len(password) < 12 {
+			return errors.New("初始超级管理员密码长度至少为 12 位")
 		}
-		return tx.Create(&AuditLog{UserID: employee.ID, Action: "bootstrap_super_admin", Resource: "role", ResourceID: fmt.Sprint(role.ID), Result: "SUCCESS", Details: "email=" + employee.Email}).Error
-	})
-	if err != nil {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+		if err != nil {
+			return fmt.Errorf("初始超级管理员密码加密失败: %w", err)
+		}
+
+		err = DB.Transaction(func(tx *gorm.DB) error {
+			department := Department{Name: "系统管理", Description: "系统初始化管理部门"}
+			if err := tx.Where("name = ?", department.Name).FirstOrCreate(&department).Error; err != nil {
+				return err
+			}
+			employee = Employee{
+				Name: name, Email: email, Password: string(hashedPassword), Position: "系统管理员",
+				DepartmentID: department.ID, Role: "super_admin", IsActive: true,
+			}
+			if err := tx.Create(&employee).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&UserRole{UserID: employee.ID, RoleID: role.ID}).Error; err != nil {
+				return err
+			}
+			return tx.Create(&AuditLog{UserID: employee.ID, Action: "bootstrap_super_admin", Resource: "role", ResourceID: fmt.Sprint(role.ID), Result: "SUCCESS", Details: "created=true email=" + employee.Email}).Error
+		})
+		if err != nil {
+			return fmt.Errorf("创建初始超级管理员失败: %w", err)
+		}
+		created = true
+	}
+
+	if !created {
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			if err := tx.Where("user_id = ?", employee.ID).Delete(&UserRole{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&UserRole{UserID: employee.ID, RoleID: role.ID}).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&Employee{}).Where("id = ?", employee.ID).Update("role", "super_admin").Error; err != nil {
+				return err
+			}
+			return tx.Create(&AuditLog{UserID: employee.ID, Action: "bootstrap_super_admin", Resource: "role", ResourceID: fmt.Sprint(role.ID), Result: "SUCCESS", Details: "email=" + employee.Email}).Error
+		})
+		if err != nil {
+			return fmt.Errorf("超级管理员初始化失败: %w", err)
+		}
+	}
+	log.Printf("已按显式配置将账号 %q 初始化为超级管理员；初始化完成后请移除 BOOTSTRAP_ADMIN_* 配置和密码文件", employee.Email)
+	return nil
+}
+
+// 保留包内旧调用名，便于既有测试覆盖“提升已有账号”的兼容路径。
+func bootstrapSuperAdmin() {
+	if err := BootstrapSuperAdmin(); err != nil {
 		log.Printf("超级管理员初始化失败: %v", err)
-		return
 	}
-	log.Printf("已按显式配置将账号 %q 初始化为超级管理员；建议移除 BOOTSTRAP_SUPER_ADMIN_EMAIL", employee.Email)
+}
+
+// EnsureSystemDefaults 写入生产可用且幂等的最小业务默认值。
+func EnsureSystemDefaults() error {
+	setting := SystemSetting{Key: "allow_registration", Value: "false", Type: "boolean"}
+	if err := DB.Where("key = ?", setting.Key).FirstOrCreate(&setting).Error; err != nil {
+		return fmt.Errorf("初始化系统注册设置失败: %w", err)
+	}
+	var ruleCount int64
+	if err := DB.Model(&PerformanceRule{}).Count(&ruleCount).Error; err != nil {
+		return fmt.Errorf("检查默认绩效规则失败: %w", err)
+	}
+	if ruleCount == 0 {
+		defaultRule := DefaultPerformanceRule()
+		if err := DB.Create(&defaultRule).Error; err != nil {
+			return fmt.Errorf("初始化默认绩效规则失败: %w", err)
+		}
+	}
+	return nil
 }
 
 // 创建测试数据
@@ -329,14 +425,9 @@ func CreateTestDataForTemplate() {
 		DB.Create(&item)
 	}
 
-	// 创建默认系统设置
-	settings := []SystemSetting{
-		{Key: "allow_registration", Value: "true", Type: "boolean"},
-	}
-
-	for _, setting := range settings {
-		DB.Create(&setting)
-	}
+	// 演示模式显式开启自助注册，生产默认值由 EnsureSystemDefaults 保持关闭。
+	setting := SystemSetting{Key: "allow_registration", Value: "true", Type: "boolean"}
+	DB.Where("key = ?", setting.Key).Assign(SystemSetting{Value: "true", Type: "boolean"}).FirstOrCreate(&setting)
 }
 
 // 创建测试数据（绩效规则）

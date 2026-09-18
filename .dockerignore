@@ -7,6 +7,7 @@ test-results/
 coverage/
 *.log*
 .env*
+secrets/
 kpi-main/
 server/uploads/
 uploads/

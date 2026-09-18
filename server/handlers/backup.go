@@ -20,8 +20,13 @@ import (
 	"github.com/google/uuid"
 )
 
-// 备份目录
-const BackupDir = "/web/db/backups"
+// 备份目录。生产 Compose 将该目录挂载到独立持久卷。
+var BackupDir = func() string {
+	if value := strings.TrimSpace(os.Getenv("BACKUP_DIR")); value != "" {
+		return value
+	}
+	return "/app/backups"
+}()
 
 // 备份响应结构
 type BackupResponse struct {

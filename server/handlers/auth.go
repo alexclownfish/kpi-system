@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"errors"
+	"fmt"
 	"net/http"
+	"os"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -13,8 +17,40 @@ import (
 	"dootask-kpi-server/utils"
 )
 
-// JWT密钥 - 生产环境中应该使用环境变量
-var jwtSecret = []byte("your-secret-key-change-in-production")
+const developmentJWTSecret = "development-only-change-me"
+
+// 默认值仅供单元测试和显式的非生产开发环境使用。生产进程会在启动时调用
+// InitAuthConfig，并拒绝空值、默认值或长度不足的密钥。
+var jwtSecret = []byte(developmentJWTSecret)
+
+// InitAuthConfig 初始化认证配置。必须在启动 HTTP 服务前调用。
+func InitAuthConfig() error {
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	production := strings.EqualFold(strings.TrimSpace(os.Getenv("APP_ENV")), "production")
+
+	if secret == "" {
+		if production {
+			return errors.New("生产环境必须设置 JWT_SECRET")
+		}
+		secret = developmentJWTSecret
+	}
+	if production && (secret == developmentJWTSecret || secret == "please-change-this-secret-in-production" || secret == "your-secret-key-change-in-production" || secret == "replace-with-a-random-secret-of-at-least-32-characters") {
+		return errors.New("生产环境 JWT_SECRET 不能使用默认值")
+	}
+	if production && len(secret) < 32 {
+		return fmt.Errorf("生产环境 JWT_SECRET 长度至少为 32 个字符，当前为 %d", len(secret))
+	}
+
+	jwtSecret = []byte(secret)
+	return nil
+}
+
+func jwtKey(token *jwt.Token) (interface{}, error) {
+	if token.Method != jwt.SigningMethodHS256 {
+		return nil, fmt.Errorf("不支持的 JWT 签名算法: %s", token.Method.Alg())
+	}
+	return jwtSecret, nil
+}
 
 // JWT Claims结构
 type Claims struct {
@@ -74,9 +110,7 @@ func generateToken(user *models.Employee) (string, error) {
 // 验证JWT token
 func verifyToken(tokenString string) (*Claims, error) {
 	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
+	token, err := jwt.ParseWithClaims(tokenString, claims, jwtKey)
 
 	if err != nil {
 		return nil, err
@@ -337,11 +371,9 @@ func RefreshToken(c *gin.Context) {
 
 	// 验证token（即使过期也要能解析）
 	claims := &Claims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
-		return jwtSecret, nil
-	})
+	token, err := jwt.ParseWithClaims(tokenString, claims, jwtKey)
 
-	if err != nil && !token.Valid {
+	if err != nil || token == nil || !token.Valid {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效的token"})
 		return
 	}
