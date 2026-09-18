@@ -1,0 +1,4 @@
+interface:
+  display_name: "KPI 生产更新"
+  short_description: "安全拉取代码并通过 Docker Compose 更新 KPI 线上服务"
+  default_prompt: "使用 $kpi-production-update 检查并更新 KPI 生产服务。"

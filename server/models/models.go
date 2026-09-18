@@ -101,16 +101,30 @@ type Employee struct {
 
 // KPI模板模型
 type KPITemplate struct {
-	ID          uint      `json:"id" gorm:"primaryKey"`
-	Name        string    `json:"name" gorm:"not null"`
-	Description string    `json:"description"`
-	Period      string    `json:"period"` // monthly, quarterly, yearly
-	IsActive    bool      `json:"is_active" gorm:"default:true"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID               uint               `json:"id" gorm:"primaryKey"`
+	Name             string             `json:"name" gorm:"not null"`
+	Description      string             `json:"description"`
+	Period           string             `json:"period"` // monthly, quarterly, yearly
+	IsActive         bool               `json:"is_active" gorm:"default:true"`
+	ExportLayoutJSON string             `json:"-" gorm:"type:text"`
+	ExportLayout     ResultExportLayout `json:"export_layout" gorm:"-"`
+	CreatedAt        time.Time          `json:"created_at"`
+	UpdatedAt        time.Time          `json:"updated_at"`
 
 	// 关联关系
 	Items []KPIItem `json:"items,omitempty" gorm:"foreignKey:TemplateID"`
+}
+
+// ResultExportLayout is a controlled, versioned document layout attached to a
+// KPI template and copied into finalized result snapshots.
+type ResultExportLayout struct {
+	Version             int      `json:"version"`
+	Preset              string   `json:"preset"`
+	Title               string   `json:"title"`
+	Columns             []string `json:"columns"`
+	ShowSummary         bool     `json:"show_summary"`
+	ShowEmployeeOpinion bool     `json:"show_employee_opinion"`
+	SignatureLabels     []string `json:"signature_labels"`
 }
 
 // KPI考核项目模型

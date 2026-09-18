@@ -11,11 +11,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Plus, Edit, Trash2, ClipboardList, Settings, Eye } from "lucide-react"
-import { templateApi, itemApi, type KPITemplate, type KPIItem } from "@/lib/api"
+import { Plus, Edit, Trash2, ClipboardList, Settings, Eye, ArrowUp, ArrowDown, Save, X } from "lucide-react"
+import { templateApi, itemApi, type KPITemplate, type KPIItem, type ResultExportColumn, type ResultExportLayout } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { getPeriodLabel, formatScore } from "@/lib/utils"
 import { LoadingInline } from "@/components/loading"
+import { toast } from "sonner"
 
 const defaultTemplateFormData = {
   name: "",
@@ -31,8 +32,43 @@ const defaultItemFormData = {
   order: 1,
 }
 
+const exportFields: Array<{ key: ResultExportColumn; label: string; required?: boolean }> = [
+  { key: "item_name", label: "指标", required: true },
+  { key: "item_description", label: "指标说明" },
+  { key: "max_score", label: "满分" },
+  { key: "self_score", label: "自评分" },
+  { key: "self_comment", label: "自评说明" },
+  { key: "manager_score", label: "主管评分" },
+  { key: "manager_comment", label: "主管说明" },
+  { key: "hr_score", label: "HR评分" },
+  { key: "hr_comment", label: "HR说明" },
+  { key: "final_score", label: "最终得分", required: true },
+  { key: "final_comment", label: "最终评价" },
+]
+
+const exportPresets: Record<ResultExportLayout["preset"], ResultExportLayout> = {
+  final_signoff: {
+    version: 1,
+    preset: "final_signoff",
+    title: "绩效考核结果确认表",
+    columns: ["item_name", "max_score", "final_score", "final_comment"],
+    show_summary: true,
+    show_employee_opinion: true,
+    signature_labels: ["员工签字", "直属主管签字", "HR签字", "签字日期"],
+  },
+  full_process: {
+    version: 1,
+    preset: "full_process",
+    title: "绩效考核结果确认表",
+    columns: exportFields.map(field => field.key),
+    show_summary: true,
+    show_employee_opinion: true,
+    signature_labels: ["员工签字", "直属主管签字", "HR签字", "签字日期"],
+  },
+}
+
 export default function TemplatesPage() {
-  const { Confirm } = useAppContext()
+  const { Alert, Confirm } = useAppContext()
   const [templates, setTemplates] = useState<KPITemplate[]>([])
   const [selectedTemplate, setSelectedTemplate] = useState<KPITemplate | null>(null)
   const [templateTabValue, setTemplateTabValue] = useState("templates")
@@ -44,6 +80,8 @@ export default function TemplatesPage() {
   const [editingItem, setEditingItem] = useState<KPIItem | null>(null)
   const [templateFormData, setTemplateFormData] = useState(defaultTemplateFormData)
   const [itemFormData, setItemFormData] = useState(defaultItemFormData)
+  const [exportLayout, setExportLayout] = useState<ResultExportLayout>(exportPresets.final_signoff)
+  const [savingExportLayout, setSavingExportLayout] = useState(false)
 
   // 获取模板列表
   const fetchTemplates = async () => {
@@ -151,8 +189,43 @@ export default function TemplatesPage() {
   // 选择模板并加载其KPI项目
   const handleSelectTemplate = (template: KPITemplate) => {
     setSelectedTemplate(template)
+    setExportLayout(template.export_layout || exportPresets.final_signoff)
     fetchTemplateItems(template.id)
     setTemplateTabValue("items")
+  }
+
+  const saveExportLayout = async () => {
+    if (!selectedTemplate) return
+    try {
+      setSavingExportLayout(true)
+      const response = await templateApi.update(selectedTemplate.id, { export_layout: exportLayout })
+      setSelectedTemplate(response.data)
+      setExportLayout(response.data.export_layout)
+      setTemplates(current => current.map(template => template.id === response.data.id ? response.data : template))
+      toast.success("结果导出版式已保存")
+    } catch (error) {
+      const detail = (error as { response?: { data?: { message?: string; error?: string } } }).response?.data
+      await Alert("保存失败", detail?.message || detail?.error || "结果导出版式保存失败，请检查配置后重试。")
+    } finally {
+      setSavingExportLayout(false)
+    }
+  }
+
+  const toggleExportColumn = (key: ResultExportColumn, checked: boolean) => {
+    const field = exportFields.find(item => item.key === key)
+    if (field?.required && !checked) return
+    setExportLayout(current => ({
+      ...current,
+      columns: checked ? [...current.columns, key] : current.columns.filter(column => column !== key),
+    }))
+  }
+
+  const moveExportColumn = (index: number, direction: -1 | 1) => {
+    const target = index + direction
+    if (target < 0 || target >= exportLayout.columns.length) return
+    const columns = [...exportLayout.columns]
+    ;[columns[index], columns[target]] = [columns[target], columns[index]]
+    setExportLayout(current => ({ ...current, columns }))
   }
 
   // 打开编辑模板对话框
@@ -257,6 +330,7 @@ export default function TemplatesPage() {
           {selectedTemplate && (
             <TabsTrigger value="items">KPI项目 {selectedTemplate && `(${selectedTemplate.name})`}</TabsTrigger>
           )}
+          {selectedTemplate && <TabsTrigger value="export-layout">结果导出设置</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="templates">
@@ -457,6 +531,110 @@ export default function TemplatesPage() {
                     </TableBody>
                   </Table>
                 )}
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="export-layout">
+          {selectedTemplate && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="flex items-center"><Settings className="w-5 h-5 mr-2" />结果导出版式</span>
+                  <Button onClick={saveExportLayout} disabled={savingExportLayout}>
+                    <Save className="w-4 h-4 mr-2" />{savingExportLayout ? "保存中..." : "保存版式"}
+                  </Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>系统预设</Label>
+                    <Select
+                      value={exportLayout.preset}
+                      onValueChange={(value: ResultExportLayout["preset"]) => setExportLayout({ ...exportPresets[value] })}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="final_signoff">最终签字简版</SelectItem>
+                        <SelectItem value="full_process">评分过程完整版</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="export-title">表格标题</Label>
+                    <Input id="export-title" maxLength={60} value={exportLayout.title} onChange={event => setExportLayout(current => ({ ...current, title: event.target.value }))} />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <h3 className="font-medium">评分明细列</h3>
+                    <p className="text-sm text-muted-foreground">勾选字段后，可在下方调整实际导出顺序。指标和最终得分为必选。</p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {exportFields.map(field => (
+                      <label key={field.key} className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                        <input
+                          type="checkbox"
+                          checked={exportLayout.columns.includes(field.key)}
+                          disabled={field.required}
+                          onChange={event => toggleExportColumn(field.key, event.target.checked)}
+                        />
+                        {field.label}{field.required && <Badge variant="outline">必选</Badge>}
+                      </label>
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    {exportLayout.columns.map((column, index) => (
+                      <div key={column} className="flex items-center justify-between rounded-md border px-3 py-2">
+                        <span>{index + 1}. {exportFields.find(field => field.key === column)?.label || column}</span>
+                        <div className="flex gap-1">
+                          <Button type="button" variant="ghost" size="sm" disabled={index === 0} onClick={() => moveExportColumn(index, -1)}><ArrowUp className="w-4 h-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" disabled={index === exportLayout.columns.length - 1} onClick={() => moveExportColumn(index, 1)}><ArrowDown className="w-4 h-4" /></Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                    <input type="checkbox" checked={exportLayout.show_summary} onChange={event => setExportLayout(current => ({ ...current, show_summary: event.target.checked }))} />显示总结评价
+                  </label>
+                  <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+                    <input type="checkbox" checked={exportLayout.show_employee_opinion} onChange={event => setExportLayout(current => ({ ...current, show_employee_opinion: event.target.checked }))} />显示员工确认意见
+                  </label>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div><h3 className="font-medium">签字栏</h3><p className="text-sm text-muted-foreground">支持 1-6 个签字栏。</p></div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={exportLayout.signature_labels.length >= 6}
+                      onClick={() => setExportLayout(current => ({ ...current, signature_labels: [...current.signature_labels, `签字人${current.signature_labels.length + 1}`] }))}
+                    ><Plus className="w-4 h-4 mr-1" />添加</Button>
+                  </div>
+                  {exportLayout.signature_labels.map((label, index) => (
+                    <div key={index} className="flex gap-2">
+                      <Input
+                        maxLength={20}
+                        value={label}
+                        onChange={event => setExportLayout(current => ({ ...current, signature_labels: current.signature_labels.map((item, itemIndex) => itemIndex === index ? event.target.value : item) }))}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={exportLayout.signature_labels.length <= 1}
+                        onClick={() => setExportLayout(current => ({ ...current, signature_labels: current.signature_labels.filter((_, itemIndex) => itemIndex !== index) }))}
+                      ><X className="w-4 h-4" /></Button>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           )}

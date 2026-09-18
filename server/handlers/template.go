@@ -1,13 +1,28 @@
 package handlers
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"dootask-kpi-server/models"
 
 	"github.com/gin-gonic/gin"
 )
+
+type templateMutationRequest struct {
+	Name         *string                    `json:"name"`
+	Description  *string                    `json:"description"`
+	Period       *string                    `json:"period"`
+	IsActive     *bool                      `json:"is_active"`
+	ExportLayout *models.ResultExportLayout `json:"export_layout"`
+}
+
+func hydrateTemplateLayout(template *models.KPITemplate) {
+	layout, _ := normalizeStoredExportLayout(template.ExportLayoutJSON)
+	template.ExportLayout = layout
+}
 
 // 获取所有KPI模板
 func GetTemplates(c *gin.Context) {
@@ -21,6 +36,9 @@ func GetTemplates(c *gin.Context) {
 		})
 		return
 	}
+	for i := range templates {
+		hydrateTemplateLayout(&templates[i])
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":  templates,
@@ -30,14 +48,33 @@ func GetTemplates(c *gin.Context) {
 
 // 创建KPI模板
 func CreateTemplate(c *gin.Context) {
-	var template models.KPITemplate
-
-	if err := c.ShouldBindJSON(&template); err != nil {
+	var request templateMutationRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
 		return
+	}
+	if request.Name == nil || strings.TrimSpace(*request.Name) == "" || request.Period == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误", "message": "模板名称和考核周期不能为空"})
+		return
+	}
+	layout := defaultExportLayout(exportPresetFinalSignoff)
+	if request.ExportLayout != nil {
+		layout = *request.ExportLayout
+	}
+	raw, layout, err := marshalExportLayout(layout)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "导出版式配置无效", "message": err.Error()})
+		return
+	}
+	template := models.KPITemplate{Name: strings.TrimSpace(*request.Name), Period: *request.Period, IsActive: true, ExportLayoutJSON: raw, ExportLayout: layout}
+	if request.Description != nil {
+		template.Description = *request.Description
+	}
+	if request.IsActive != nil {
+		template.IsActive = *request.IsActive
 	}
 
 	result := models.DB.Create(&template)
@@ -74,6 +111,7 @@ func GetTemplate(c *gin.Context) {
 		})
 		return
 	}
+	hydrateTemplateLayout(&template)
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": template,
@@ -100,7 +138,7 @@ func UpdateTemplate(c *gin.Context) {
 		return
 	}
 
-	var updateData models.KPITemplate
+	var updateData templateMutationRequest
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
@@ -108,14 +146,49 @@ func UpdateTemplate(c *gin.Context) {
 		})
 		return
 	}
-
-	result = models.DB.Model(&template).Updates(updateData)
+	updates := map[string]any{}
+	if updateData.Name != nil {
+		name := strings.TrimSpace(*updateData.Name)
+		if name == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误", "message": "模板名称不能为空"})
+			return
+		}
+		updates["name"] = name
+	}
+	if updateData.Description != nil {
+		updates["description"] = *updateData.Description
+	}
+	if updateData.Period != nil {
+		updates["period"] = *updateData.Period
+	}
+	if updateData.IsActive != nil {
+		updates["is_active"] = *updateData.IsActive
+	}
+	layoutChanged := false
+	if updateData.ExportLayout != nil {
+		raw, layout, err := marshalExportLayout(*updateData.ExportLayout)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "导出版式配置无效", "message": err.Error()})
+			return
+		}
+		updates["export_layout_json"] = raw
+		template.ExportLayout = layout
+		layoutChanged = raw != template.ExportLayoutJSON
+	}
+	result = models.DB.Model(&template).Updates(updates)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "更新模板失败",
 			"message": result.Error.Error(),
 		})
 		return
+	}
+	if err := models.DB.First(&template, template.ID).Error; err == nil {
+		hydrateTemplateLayout(&template)
+	}
+	if layoutChanged {
+		details, _ := json.Marshal(template.ExportLayout)
+		RecordAuditDetails(c, "update_template_export_layout", "kpi_template", strconv.FormatUint(uint64(template.ID), 10), "SUCCESS", string(details))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

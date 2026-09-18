@@ -48,16 +48,16 @@ func formatPeriodDisplay(period string, year int, month *int, quarter *int) stri
 
 // 导出响应结构
 type ExportResponse struct {
-	FileURL      string `json:"file_url"`
-	FileName     string `json:"file_name"`
-	FileSize     int64  `json:"file_size"`
-	Message      string `json:"message"`
+	FileURL       string `json:"file_url"`
+	FileName      string `json:"file_name"`
+	FileSize      int64  `json:"file_size"`
+	Message       string `json:"message"`
 	ResultVersion int    `json:"result_version,omitempty"`
-	Checksum     string `json:"checksum,omitempty"`
+	Checksum      string `json:"checksum,omitempty"`
 }
 
 // 导出评估报告为Excel
-func ExportEvaluationToExcel(c *gin.Context) {
+func exportEvaluationLegacy(c *gin.Context) {
 	id := c.Param("id")
 	evaluationId, err := strconv.ParseUint(id, 10, 32)
 	if err != nil {

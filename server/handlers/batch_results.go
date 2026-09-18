@@ -583,7 +583,9 @@ func ExportSignoffBatch(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("生成 %s 的结果版本失败", evaluation.Employee.Name)})
 			return
 		}
-		pdfPath, pdfErr := renderSignoffPDF(evaluation, snapshot, payload, tempDir)
+		base := fmt.Sprintf("%06d-%s-%s", evaluation.ID, safeFileName(payload.EmployeeName), safeFileName(formatPeriodDisplay(payload.Period, payload.Year, payload.Month, payload.Quarter)))
+		pdfPath := filepath.Join(tempDir, base+".pdf")
+		pdfErr := renderResultPDFFile(buildExportDocument(snapshot, payload), pdfPath)
 		if pdfErr != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": pdfErr.Error()})
 			return

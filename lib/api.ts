@@ -127,6 +127,30 @@ export interface KPITemplate {
   is_active: boolean
   created_at: string
   items?: KPIItem[]
+  export_layout: ResultExportLayout
+}
+
+export type ResultExportColumn =
+  | "item_name"
+  | "item_description"
+  | "max_score"
+  | "self_score"
+  | "self_comment"
+  | "manager_score"
+  | "manager_comment"
+  | "hr_score"
+  | "hr_comment"
+  | "final_score"
+  | "final_comment"
+
+export interface ResultExportLayout {
+  version: number
+  preset: "final_signoff" | "full_process"
+  title: string
+  columns: ResultExportColumn[]
+  show_summary: boolean
+  show_employee_opinion: boolean
+  signature_labels: string[]
 }
 
 export interface KPIItem {
@@ -524,7 +548,7 @@ export const accessControlApi = {
 export const templateApi = {
   getAll: (): Promise<{ data: KPITemplate[]; total: number }> => api.get("/templates"),
   getById: (id: number): Promise<{ data: KPITemplate }> => api.get(`/templates/${id}`),
-  create: (data: Omit<KPITemplate, "id" | "created_at">): Promise<{ data: KPITemplate }> =>
+  create: (data: Omit<KPITemplate, "id" | "created_at" | "export_layout"> & { export_layout?: ResultExportLayout }): Promise<{ data: KPITemplate }> =>
     api.post("/templates", data),
   update: (id: number, data: Partial<KPITemplate>): Promise<{ data: KPITemplate }> => api.put(`/templates/${id}`, data),
   delete: (id: number): Promise<void> => api.delete(`/templates/${id}`),
@@ -628,7 +652,8 @@ export const statisticsApi = {
 
 // 导出API
 export const exportApi = {
-  evaluation: (id: number): Promise<ExportResponse> => api.get(`/export/evaluation/${id}`),
+  evaluation: (id: number, format: "xlsx" | "pdf" = "xlsx"): Promise<ExportResponse> =>
+    api.get(`/export/evaluation/${id}`, { params: { format } }),
   department: (id: number): Promise<ExportResponse> => api.get(`/export/department/${id}`),
   period: (period: string, params?: { year?: string; month?: string; quarter?: string }): Promise<ExportResponse> =>
     api.get(`/export/period/${period}`, { params }),

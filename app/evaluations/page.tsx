@@ -1598,17 +1598,17 @@ export default function EvaluationsPage() {
     }
   }
 
-  const handleExportResult = async () => {
+  const handleExportResult = async (format: "xlsx" | "pdf" = "xlsx") => {
     if (!selectedEvaluation) return
     try {
       setIsExportingResult(true)
-      const response = await exportApi.evaluation(selectedEvaluation.id)
+      const response = await exportApi.evaluation(selectedEvaluation.id, format)
       try {
         await downloadUrl(response.file_url)
       } catch {
         window.open(response.file_url, "_blank")
       }
-      toast.success(`最终评分表导出成功${response.result_version ? `（V${response.result_version}）` : ""}`)
+      toast.success(`${format === "pdf" ? "PDF" : "Excel"}最终评分表导出成功${response.result_version ? `（V${response.result_version}）` : ""}`)
     } catch (error) {
       await Alert("导出失败", getErrorMessage(error, "最终评分表导出失败，请重试"))
     } finally {
@@ -3815,9 +3815,16 @@ export default function EvaluationsPage() {
               <DialogFooter className="flex-col sm:flex-row justify-end gap-2 sm:space-x-2 sm:gap-0">
                 {["pending_confirm", "completed"].includes(selectedEvaluation.status) &&
                   hasPermission("report:export") && (
-                    <Button variant="outline" onClick={handleExportResult} disabled={isExportingResult}>
+                    <Button variant="outline" onClick={() => handleExportResult("xlsx")} disabled={isExportingResult}>
                       {isExportingResult ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
-                      {isExportingResult ? "导出中..." : "导出最终评分表"}
+                      {isExportingResult ? "导出中..." : "导出 Excel"}
+                    </Button>
+                  )}
+                {["pending_confirm", "completed"].includes(selectedEvaluation.status) &&
+                  hasPermission("report:export") && (
+                    <Button variant="outline" onClick={() => handleExportResult("pdf")} disabled={isExportingResult}>
+                      {isExportingResult ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileSignature className="w-4 h-4 mr-1" />}
+                      {isExportingResult ? "导出中..." : "导出 PDF"}
                     </Button>
                   )}
                 {selectedEvaluation.status === "pending_confirm" &&

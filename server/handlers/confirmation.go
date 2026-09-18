@@ -25,32 +25,39 @@ import (
 const maxSignoffFileSize int64 = 10 << 20
 
 type resultSnapshotItem struct {
-	ItemID       uint    `json:"item_id"`
-	Name         string  `json:"name"`
-	Description  string  `json:"description"`
-	MaxScore     float64 `json:"max_score"`
-	FinalScore   float64 `json:"final_score"`
-	FinalComment string  `json:"final_comment"`
+	ItemID         uint     `json:"item_id"`
+	Name           string   `json:"name"`
+	Description    string   `json:"description"`
+	MaxScore       float64  `json:"max_score"`
+	SelfScore      *float64 `json:"self_score,omitempty"`
+	SelfComment    string   `json:"self_comment,omitempty"`
+	ManagerScore   *float64 `json:"manager_score,omitempty"`
+	ManagerComment string   `json:"manager_comment,omitempty"`
+	HRScore        *float64 `json:"hr_score,omitempty"`
+	HRComment      string   `json:"hr_comment,omitempty"`
+	FinalScore     float64  `json:"final_score"`
+	FinalComment   string   `json:"final_comment"`
 }
 
 type resultSnapshotPayload struct {
-	EvaluationID   uint                 `json:"evaluation_id"`
-	EmployeeID     uint                 `json:"employee_id"`
-	EmployeeName   string               `json:"employee_name"`
-	EmployeeEmail  string               `json:"employee_email"`
-	Position       string               `json:"position"`
-	Department     string               `json:"department"`
-	TemplateID     uint                 `json:"template_id"`
-	TemplateName   string               `json:"template_name"`
-	Period         string               `json:"period"`
-	Year           int                  `json:"year"`
-	Month          *int                 `json:"month,omitempty"`
-	Quarter        *int                 `json:"quarter,omitempty"`
-	TotalScore     float64              `json:"total_score"`
-	FinalComment   string               `json:"final_comment"`
-	Objection      string               `json:"objection_reason"`
-	HasObjection   bool                 `json:"has_objection"`
-	Items          []resultSnapshotItem `json:"items"`
+	EvaluationID  uint                      `json:"evaluation_id"`
+	EmployeeID    uint                      `json:"employee_id"`
+	EmployeeName  string                    `json:"employee_name"`
+	EmployeeEmail string                    `json:"employee_email"`
+	Position      string                    `json:"position"`
+	Department    string                    `json:"department"`
+	TemplateID    uint                      `json:"template_id"`
+	TemplateName  string                    `json:"template_name"`
+	Period        string                    `json:"period"`
+	Year          int                       `json:"year"`
+	Month         *int                      `json:"month,omitempty"`
+	Quarter       *int                      `json:"quarter,omitempty"`
+	TotalScore    float64                   `json:"total_score"`
+	FinalComment  string                    `json:"final_comment"`
+	Objection     string                    `json:"objection_reason"`
+	HasObjection  bool                      `json:"has_objection"`
+	Items         []resultSnapshotItem      `json:"items"`
+	ExportLayout  models.ResultExportLayout `json:"export_layout"`
 }
 
 func effectiveFinalScore(score models.KPIScore) float64 {
@@ -90,9 +97,13 @@ func buildResultSnapshot(evaluation models.KPIEvaluation) (resultSnapshotPayload
 		}
 		items = append(items, resultSnapshotItem{
 			ItemID: score.ItemID, Name: score.Item.Name, Description: score.Item.Description,
-			MaxScore: score.Item.MaxScore, FinalScore: effectiveFinalScore(score), FinalComment: comment,
+			MaxScore: score.Item.MaxScore, SelfScore: score.SelfScore, SelfComment: score.SelfComment,
+			ManagerScore: score.ManagerScore, ManagerComment: score.ManagerComment,
+			HRScore: score.HRScore, HRComment: score.HRComment,
+			FinalScore: effectiveFinalScore(score), FinalComment: comment,
 		})
 	}
+	layout, _ := normalizeStoredExportLayout(evaluation.Template.ExportLayoutJSON)
 	payload := resultSnapshotPayload{
 		EvaluationID: evaluation.ID, EmployeeID: evaluation.EmployeeID, EmployeeName: evaluation.Employee.Name,
 		EmployeeEmail: evaluation.Employee.Email, Position: evaluation.Employee.Position,
@@ -100,7 +111,7 @@ func buildResultSnapshot(evaluation models.KPIEvaluation) (resultSnapshotPayload
 		TemplateName: evaluation.Template.Name, Period: evaluation.Period, Year: evaluation.Year,
 		Month: evaluation.Month, Quarter: evaluation.Quarter, TotalScore: evaluation.TotalScore,
 		FinalComment: evaluation.FinalComment, Objection: evaluation.ObjectionReason,
-		HasObjection: evaluation.HasObjection, Items: items,
+		HasObjection: evaluation.HasObjection, Items: items, ExportLayout: layout,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
@@ -115,12 +126,38 @@ func GetOrCreateResultSnapshot(db *gorm.DB, evaluationID, createdBy uint) (model
 	if err != nil {
 		return models.EvaluationResultSnapshot{}, resultSnapshotPayload{}, err
 	}
-	payload, raw, checksum, err := buildResultSnapshot(evaluation)
+	payload, _, _, err := buildResultSnapshot(evaluation)
 	if err != nil {
 		return models.EvaluationResultSnapshot{}, payload, err
 	}
+	var latest models.EvaluationResultSnapshot
+	if err := db.Where("evaluation_id = ?", evaluationID).Order("version DESC").First(&latest).Error; err == nil {
+		var previous resultSnapshotPayload
+		if json.Unmarshal([]byte(latest.SnapshotJSON), &previous) == nil {
+			var rawFields map[string]json.RawMessage
+			_ = json.Unmarshal([]byte(latest.SnapshotJSON), &rawFields)
+			previous.ExportLayout = normalizeExportLayout(previous.ExportLayout)
+			if evaluation.Status == "completed" || rawFields["export_layout"] == nil {
+				return latest, previous, nil
+			}
+		}
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return models.EvaluationResultSnapshot{}, payload, err
+	}
+	rawBytes, err := json.Marshal(payload)
+	if err != nil {
+		return models.EvaluationResultSnapshot{}, payload, err
+	}
+	raw := string(rawBytes)
+	sum := sha256.Sum256(rawBytes)
+	checksum := hex.EncodeToString(sum[:])
 	var existing models.EvaluationResultSnapshot
 	if err := db.Where("evaluation_id = ? AND checksum = ?", evaluationID, checksum).First(&existing).Error; err == nil {
+		var stored resultSnapshotPayload
+		if json.Unmarshal([]byte(existing.SnapshotJSON), &stored) == nil {
+			stored.ExportLayout = normalizeExportLayout(stored.ExportLayout)
+			return existing, stored, nil
+		}
 		return existing, payload, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return models.EvaluationResultSnapshot{}, payload, err
