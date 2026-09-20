@@ -22,7 +22,7 @@
 
 **Project Type**: Next.js 前端 + Go API 后端的单仓库 Web 应用
 
-**Performance Goals**: 单份导出在正常考核规模下交互可用；100 份批量导出不串用模板配置且全部成功生成
+**Performance Goals**: 单份导出在正常考核规模下交互可用；100 份批量导出不串用模板配置且全部成功生成；单份 PDF 以 A4 竖向为打印基准
 
 **Constraints**: 保留现有 SQLite 数据；不能清除 Compose 数据卷；历史快照必须兼容；导出必须执行权限与数据范围校验；不引入自由表格设计器
 

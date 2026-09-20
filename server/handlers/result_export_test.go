@@ -117,6 +117,20 @@ func TestResultPDFPathsUseAbsoluteUnicodeFileURL(t *testing.T) {
 	}
 }
 
+func TestResultPDFUsesPortraitA4Layout(t *testing.T) {
+	if !strings.Contains(resultPDFHTML, "@page{size:A4 portrait") {
+		t.Fatal("result PDF must use A4 portrait orientation")
+	}
+	if strings.Contains(resultPDFHTML, "A4 landscape") {
+		t.Fatal("result PDF must not use landscape orientation")
+	}
+	for _, required := range []string{"table-layout:fixed", "overflow-wrap:anywhere", "display:table-header-group"} {
+		if !strings.Contains(resultPDFHTML, required) {
+			t.Fatalf("portrait PDF missing compact pagination style %q", required)
+		}
+	}
+}
+
 func TestMixedTemplateDocumentsDoNotShareColumns(t *testing.T) {
 	simple := defaultExportLayout(exportPresetFinalSignoff)
 	full := defaultExportLayout(exportPresetFullProcess)

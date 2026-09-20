@@ -100,6 +100,10 @@
 - [X] T033 Change snapshot lifecycle so `pending_confirm` exports adopt the latest saved template layout while `completed` evaluations retain their completed snapshot in `server/handlers/confirmation.go` per FR-009A (contradicts)
 - [X] T034 Add regression tests for Unicode absolute PDF file URLs, pending-confirm layout version refresh, and completed-layout immutability in `server/handlers/result_export_test.go` per US3/AC1 and US4/AC1 (missing)
 
+## Phase 9: Convergence
+
+- [X] T035 Change single-result PDF output to A4 portrait with compact fixed-width wrapping and pagination-safe headers, and add a regression test in `server/handlers/result_export.go` and `server/handlers/result_export_test.go` per FR-007A and US4/AC3 (partial)
+
 ---
 
 ## Dependencies & Execution Order
