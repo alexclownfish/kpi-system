@@ -37,8 +37,20 @@ import {
   Calendar,
   Download,
   FileSignature,
+  RefreshCw,
 } from "lucide-react"
-import { statisticsApi, exportApi, type DashboardStats, type StatisticsResponse, type SignoffStatistics } from "@/lib/api"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import {
+  getApiErrorMessage,
+  getApiErrorRequestId,
+  statisticsApi,
+  exportApi,
+  type DashboardStats,
+  type PerformanceSummary,
+  type StatisticsResponse,
+  type SignoffStatistics,
+} from "@/lib/api"
 import { getPeriodValue, formatScore } from "@/lib/utils"
 import { useAppContext } from "@/lib/app-context"
 import { LoadingInline } from "@/components/loading"
@@ -52,6 +64,11 @@ export default function StatisticsPage() {
   const [dashboardStats, setDashboardStats] = useState<DashboardStats | null>(null)
   const [statisticsData, setStatisticsData] = useState<StatisticsResponse | null>(null)
   const [signoffData, setSignoffData] = useState<SignoffStatistics | null>(null)
+  const [performanceSummary, setPerformanceSummary] = useState<PerformanceSummary | null>(null)
+  const [performanceSummaryEmployeeId, setPerformanceSummaryEmployeeId] = useState<number | null>(null)
+  const [performanceSummaryLoading, setPerformanceSummaryLoading] = useState(false)
+  const [performanceSummaryError, setPerformanceSummaryError] = useState<string | null>(null)
+  const [performanceSummaryRequestId, setPerformanceSummaryRequestId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   // 获取默认时间信息
   const getDefaultPeriodInfo = useCallback((period: string) => {
@@ -92,6 +109,39 @@ export default function StatisticsPage() {
   const [selectedMonth, setSelectedMonth] = useState(defaultInfo.month)
   const [selectedQuarter, setSelectedQuarter] = useState(defaultInfo.quarter)
 
+  const getPerformanceSummaryParams = useCallback((employeeId: number) => {
+    const periodType = selectedPeriod === "yearly" ? "annual" : selectedPeriod
+    const period = selectedPeriod === "monthly"
+      ? `${selectedYear}-${String(selectedMonth).padStart(2, "0")}`
+      : selectedPeriod === "quarterly"
+        ? `${selectedYear}-Q${selectedQuarter}`
+        : String(selectedYear)
+    return {
+      employee_id: employeeId,
+      period_type: periodType as "monthly" | "quarterly" | "annual",
+      period,
+      diagnostics: true,
+    }
+  }, [selectedMonth, selectedPeriod, selectedQuarter, selectedYear])
+
+  const fetchPerformanceSummary = useCallback(async (employeeId: number) => {
+    setPerformanceSummaryEmployeeId(employeeId)
+    setPerformanceSummaryLoading(true)
+    setPerformanceSummaryError(null)
+    setPerformanceSummaryRequestId(null)
+    setPerformanceSummary(null)
+    try {
+      const response = await statisticsApi.getPerformanceSummary(getPerformanceSummaryParams(employeeId))
+      setPerformanceSummary(response.data)
+    } catch (error) {
+      console.error("获取绩效汇总失败:", error)
+      setPerformanceSummaryError(getApiErrorMessage(error, "绩效汇总加载失败，请重试。"))
+      setPerformanceSummaryRequestId(getApiErrorRequestId(error) || null)
+    } finally {
+      setPerformanceSummaryLoading(false)
+    }
+  }, [getPerformanceSummaryParams])
+
   // 图表配置 - 使用CSS变量以支持主题切换
   const chartConfig = {
     total: {
@@ -118,6 +168,10 @@ export default function StatisticsPage() {
   const fetchStatisticsData = useCallback(async () => {
     try {
       setLoading(true)
+      setPerformanceSummary(null)
+      setPerformanceSummaryError(null)
+      setPerformanceSummaryRequestId(null)
+      setPerformanceSummaryEmployeeId(null)
       const filterParams = {
         year: selectedYear.toString(),
         period: selectedPeriod,
@@ -134,12 +188,24 @@ export default function StatisticsPage() {
       setDashboardStats(dashboardResponse.data)
       setStatisticsData(statisticsResponse.data)
       setSignoffData(signoffResponse.data)
+
+      const summaryCandidate = (statisticsResponse.data.recentEvaluations || []).find(
+        evaluation => evaluation.status === "completed" && typeof evaluation.employee_id === "number" && evaluation.employee_id > 0,
+      )
+      if (summaryCandidate?.employee_id) {
+        await fetchPerformanceSummary(summaryCandidate.employee_id)
+      } else {
+        setPerformanceSummaryEmployeeId(null)
+        setPerformanceSummary(null)
+        setPerformanceSummaryError(null)
+        setPerformanceSummaryRequestId(null)
+      }
     } catch (error) {
       console.error("获取统计数据失败:", error)
     } finally {
       setLoading(false)
     }
-  }, [selectedYear, selectedPeriod, selectedMonth, selectedQuarter])
+  }, [fetchPerformanceSummary, selectedYear, selectedPeriod, selectedMonth, selectedQuarter])
 
   // 当周期类型改变时，自动调整默认时间
   useEffect(() => {
@@ -323,6 +389,69 @@ export default function StatisticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>绩效汇总来源与诊断</CardTitle>
+            <p className="text-sm text-muted-foreground mt-1">
+              汇总取最近一条已完成考核，并按当前周期读取来源快照和计算版本。
+            </p>
+          </div>
+          {performanceSummary && (
+            <Badge variant={performanceSummary.diagnostic_level === "blocking" ? "destructive" : performanceSummary.diagnostic_level === "warning" ? "secondary" : "default"}>
+              {performanceSummary.diagnostic_level === "blocking" ? "阻断" : performanceSummary.diagnostic_level === "warning" ? "需关注" : "正常"}
+            </Badge>
+          )}
+        </CardHeader>
+        <CardContent>
+          {performanceSummaryLoading ? (
+            <div className="text-sm text-muted-foreground">正在读取汇总诊断…</div>
+          ) : performanceSummaryError ? (
+            <Alert variant="destructive">
+              <AlertTitle>汇总读取失败</AlertTitle>
+              <AlertDescription className="flex flex-wrap items-center gap-3">
+                <span>{performanceSummaryError}</span>
+                {performanceSummaryRequestId && <span className="text-xs">请求标识：{performanceSummaryRequestId}</span>}
+                {performanceSummaryEmployeeId && (
+                  <Button type="button" size="sm" variant="outline" onClick={() => fetchPerformanceSummary(performanceSummaryEmployeeId)}>
+                    <RefreshCw className="w-4 h-4 mr-1" />重试
+                  </Button>
+                )}
+              </AlertDescription>
+            </Alert>
+          ) : performanceSummary ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+              <div><div className="text-muted-foreground">总分 / 等级</div><div className="text-lg font-semibold">{formatScore(performanceSummary.total_score)} / {performanceSummary.grade}</div></div>
+              <div><div className="text-muted-foreground">汇总考核数</div><div className="text-lg font-semibold">{performanceSummary.evaluation_count || 1} 条</div></div>
+              <div><div className="text-muted-foreground">来源快照 SHA-256</div><div className="font-mono text-xs break-all">{performanceSummary.source_snapshot_sha256 || "未提供（历史版本）"}</div></div>
+              <div><div className="text-muted-foreground">计算版本</div><div className="font-mono">{performanceSummary.calculation_version}</div></div>
+              <div><div className="text-muted-foreground">投入占比 / 加权贡献</div><div>{performanceSummary.allocation_ratio == null ? "未提供投入占比" : `${(performanceSummary.allocation_ratio * 100).toFixed(1)}% / ${performanceSummary.weighted_contribution == null ? "0" : formatScore(performanceSummary.weighted_contribution)}`}</div><div className="text-xs text-muted-foreground">阈值 {(performanceSummary.allocation_threshold * 100).toFixed(0)}%</div></div>
+              {performanceSummary.diagnostics && performanceSummary.diagnostics.length > 0 && (
+                <div className="md:col-span-2 lg:col-span-4 rounded-md bg-muted/50 p-3">
+                  <div className="font-medium">诊断信息</div>
+                  <ul className="list-disc pl-5 mt-1 text-muted-foreground">
+                    {performanceSummary.diagnostics.map(diagnostic => <li key={diagnostic}>{diagnostic}</li>)}
+                  </ul>
+                </div>
+              )}
+              {performanceSummary.projects && performanceSummary.projects.length > 0 && (
+                <div className="md:col-span-2 lg:col-span-4 space-y-1 rounded-md border p-3 text-sm">
+                  <div className="font-medium">项目贡献</div>
+                  {performanceSummary.projects.map(project => (
+                    <div key={project.evaluation_id} className="flex flex-wrap justify-between gap-2 text-muted-foreground">
+                      <span>{project.project_name || `考核 #${project.evaluation_id}`}</span>
+                      <span>{formatScore(project.total_score)} 分{project.allocation_ratio == null ? " · 未提供投入占比" : ` · 投入 ${(project.allocation_ratio * 100).toFixed(1)}%`}{project.weighted_contribution == null ? "" : ` · 贡献 ${formatScore(project.weighted_contribution)}`}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-sm text-muted-foreground">当前筛选条件下暂无可诊断的已完成考核。</div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* 数据分析图表 */}
       <Tabs defaultValue="departments" className="space-y-4">

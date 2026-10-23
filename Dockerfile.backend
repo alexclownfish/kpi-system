@@ -7,6 +7,7 @@ ENV GIN_MODE=release
 RUN go mod tidy
 RUN go test ./...
 RUN CGO_ENABLED=1 go build -o kpi-server main.go
+RUN CGO_ENABLED=1 go build -o kpi-migrate-sqlite-to-postgres ./cmd/migrate-sqlite-to-postgres
 
 FROM debian:bookworm-slim
 WORKDIR /app
@@ -15,6 +16,7 @@ RUN sed -i 's|deb.debian.org/debian-security|mirrors.aliyun.com/debian-security|
     && apt-get install -y --no-install-recommends ca-certificates chromium fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/kpi-server /app/kpi-server
+COPY --from=builder /app/kpi-migrate-sqlite-to-postgres /app/kpi-migrate-sqlite-to-postgres
 RUN mkdir -p /app/db /app/exports /app/uploads/evaluation-confirmations
 ENV GIN_MODE=release
 ENV SYSTEM_MODE=standalone

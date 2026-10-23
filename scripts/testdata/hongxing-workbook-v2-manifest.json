@@ -1,0 +1,36 @@
+{
+  "source_filename": "荭杏研发项目绩效考核表 (1).xlsx",
+  "source_sha256": "50bcf21db2fb357a5a471ecef459353b974355c2b7191e3f920fa708c3735fb3",
+  "sheet_count": 21,
+  "template_count": 18,
+  "indicator_count": 137,
+  "source_department_count": 9,
+  "process_sheets": ["项目绩效考核流程"],
+  "template_sheets": [
+    "01-ID工业设计-部门负责人", "01-ID工业设计-工程师",
+    "02-结构部门-部门负责人", "02-结构部门-工程师",
+    "03-电子部门-部门负责人", "03-电子部门-工程师",
+    "04-软件应用开发-部门负责人", "04-软件应用开发-工程师",
+    "05-算法开发-部门负责人", "05-算法开发-工程师",
+    "06-运动控制-部门负责人", "06-运动控制-工程师",
+    "07-测试部门-部门负责人", "07-测试部门-工程师",
+    "08-嵌入式开发-部门负责人", "08-嵌入式开发-工程师",
+    "09-产品部门-部门负责人", "09-产品部门-工程师"
+  ],
+  "hr_sheets": ["HR汇总（月度）", "HR汇总（季度）"],
+  "source_departments": [
+    "ID 工业设计部", "结构部门", "电子部门", "软件应用开发部", "算法开发部",
+    "运控部", "测试部门", "嵌入式开发部", "产品部门"
+  ],
+  "known_diagnostics": {
+    "quarterly_formula_gaps": ["I17", "J17"],
+    "quarterly_annual_formula_scope": "K40:K49 references D:J in source and requires D:G business interpretation",
+    "dimension_weight_anomalies": [
+      "02-结构部门-部门负责人",
+      "03-电子部门-部门负责人",
+      "04-软件应用开发-部门负责人",
+      "09-产品部门-部门负责人",
+      "09-产品部门-工程师"
+    ]
+  }
+}

@@ -1,0 +1,40 @@
+# Use with the base file: docker compose -f docker-compose.yml -f docker-compose.postgres.yml ...
+# PostgreSQL data lives in a dedicated named volume and is never published to the host.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${PG_DATABASE:-kpi}
+      POSTGRES_USER: ${PG_ADMIN_USER:-kpi_admin}
+      POSTGRES_PASSWORD_FILE: /run/kpi-admin-secrets/postgres_admin_password
+      KPI_APP_USER: ${PG_USER:-kpi_app}
+    volumes:
+      - kpi-postgres-data:/var/lib/postgresql/data
+      - ./pg-admin-secrets:/run/kpi-admin-secrets:ro
+      - ./secrets:/run/kpi-app-secrets:ro
+    healthcheck:
+      test: ["CMD-SHELL", 'pg_isready -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"']
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+  backend:
+    environment:
+      DB_DRIVER: postgres
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: ${PG_DATABASE:-kpi}
+      PGUSER: ${PG_USER:-kpi_app}
+      PGPASSWORD_FILE: /run/kpi-secrets/postgres_password
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  kpi-postgres-data:

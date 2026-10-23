@@ -25,8 +25,8 @@ func TestSeedAccessControlCreatesMVPCatalog(t *testing.T) {
 
 	var roleCount int64
 	DB.Model(&Role{}).Count(&roleCount)
-	if roleCount != 7 {
-		t.Fatalf("role count=%d, want 7", roleCount)
+	if roleCount != 10 {
+		t.Fatalf("role count=%d, want 10", roleCount)
 	}
 	for _, code := range []string{
 		"department:assign_manager", "kpi:disable", "assessment:publish",
@@ -38,6 +38,69 @@ func TestSeedAccessControlCreatesMVPCatalog(t *testing.T) {
 		if count != 1 {
 			t.Errorf("permission %s count=%d, want 1", code, count)
 		}
+	}
+	var productSubmitPermissions int64
+	DB.Table("role_permissions rp").
+		Joins("JOIN roles r ON r.id = rp.role_id").
+		Joins("JOIN permissions p ON p.id = rp.permission_id").
+		Where("r.code = ? AND p.code = ?", "product_manager", "assessment:submit").
+		Count(&productSubmitPermissions)
+	if productSubmitPermissions != 1 {
+		t.Fatalf("product_manager assessment:submit=%d, want 1", productSubmitPermissions)
+	}
+}
+
+func TestCustomizedSystemRoleSurvivesSeeding(t *testing.T) {
+	for _, empty := range []bool{false, true} {
+		t.Run(fmt.Sprintf("empty=%v", empty), func(t *testing.T) {
+			db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:custom-seed-%s?mode=memory&cache=shared", t.Name())), &gorm.Config{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			DB = db
+			if err := DB.AutoMigrate(&Role{}, &Permission{}, &UserRole{}, &RolePermission{}, &DataScope{}, &RoleDataScope{}); err != nil {
+				t.Fatal(err)
+			}
+			seedAccessControl()
+			var role Role
+			DB.Where("code = ?", "pm").First(&role)
+			DB.Where("role_id = ?", role.ID).Delete(&RolePermission{})
+			if !empty {
+				var p Permission
+				DB.Where("code = ?", "assessment:view").First(&p)
+				DB.Create(&RolePermission{RoleID: role.ID, PermissionID: p.ID})
+			}
+			if err := DB.Model(&role).Update("access_customized", true).Error; err != nil {
+				t.Fatal(err)
+			}
+			var self DataScope
+			DB.Where("code = ?", "SELF").First(&self)
+			DB.Where("role_id = ?", role.ID).Delete(&RoleDataScope{})
+			DB.Create(&RoleDataScope{RoleID: role.ID, DataScopeID: self.ID})
+			seedAccessControl()
+			seedAccessControl()
+			var permissions, scopes int64
+			DB.Model(&RolePermission{}).Where("role_id = ?", role.ID).Count(&permissions)
+			DB.Model(&RoleDataScope{}).Where("role_id = ?", role.ID).Count(&scopes)
+			want := int64(1)
+			if empty {
+				want = 0
+			}
+			if permissions != want || scopes != 1 {
+				t.Fatalf("defaults restored: perms=%d scope=%d", permissions, scopes)
+			}
+			var binding RoleDataScope
+			DB.Where("role_id = ?", role.ID).First(&binding)
+			if binding.DataScopeID != self.ID {
+				t.Fatal("scope restored")
+			}
+			var other Role
+			DB.Where("code = ?", "product_manager").First(&other)
+			DB.Model(&RolePermission{}).Where("role_id = ?", other.ID).Count(&permissions)
+			if permissions == 0 {
+				t.Fatal("other defaults lost")
+			}
+		})
 	}
 }
 

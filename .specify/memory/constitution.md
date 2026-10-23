@@ -30,8 +30,9 @@ API MUST 返回稳定、可理解的成功和错误结构；敏感字段（包�
 ### V. 数据与部署安全
 
 数据库初始化和种子数据 MUST 幂等。Schema 变更 MUST 保留现有业务数据并提供兼容或迁移说明。
-测试和日常重启不得删除 Compose 数据卷；任何会清空 SQLite 数据或持久化卷的操作 MUST 获得
-明确授权。Docker Compose MUST 提供可重复的构建、启动、健康检查和停止方式。
+测试和日常重启不得删除 Compose 数据卷；任何会清空数据库数据或持久化卷的操作 MUST 获得
+明确授权。切换数据库引擎 MUST 先保留源库与附件的可恢复副本，并完成全表、关联、序列、附件的
+迁移验收。Docker Compose MUST 提供可重复的构建、启动、健康检查和停止方式。
 
 ### VI. 单一代码源与最小复杂度
 
@@ -41,7 +42,8 @@ API MUST 返回稳定、可理解的成功和错误结构；敏感字段（包�
 
 ## Technical Constraints
 
-- 前端技术基线为 Next.js 15、React 19 和 TypeScript；后端为 Go 1.23、Gin、GORM 和 SQLite。
+- 前端技术基线为 Next.js 15、React 19 和 TypeScript；后端为 Go 1.23、Gin 和 GORM。
+  SQLite 保留现有环境兼容；生产迁移到 PostgreSQL 必须显式配置数据库引擎并验证无静默回退。
 - 身份认证使用 JWT，密码 MUST 使用 bcrypt 或更强的单向密码哈希存储。
 - Role、Permission 和 Data Scope MUST 保持数据驱动；业务代码不得以页面角色名称替代权限校验。
 - 高风险操作（角色分配、密码重置、权限或系统配置变更、关键数据删除）MUST 写入审计记录。
@@ -70,4 +72,4 @@ API MUST 返回稳定、可理解的成功和错误结构；敏感字段（包�
 每个 Plan 必须完成 Constitution Check；代码审查和 Converge 必须复核适用条款。确需例外时，
 必须在 `plan.md` 的 Complexity Tracking 中记录原因、风险、替代方案和批准结论。
 
-**Version**: 1.0.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-09-17
+**Version**: 1.1.0 | **Ratified**: 2026-09-17 | **Last Amended**: 2026-10-23

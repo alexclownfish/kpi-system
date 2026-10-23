@@ -1,5 +1,4 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import { headers } from "next/headers"
 import { AppProvider } from "@/lib/app-context"
 
@@ -10,8 +9,6 @@ import { LayoutProvider } from "@/lib/layout-context"
 import { UnreadProvider } from "@/lib/unread-context"
 import { NotificationProvider } from "@/lib/notification-context"
 import "./globals.css"
-
-const inter = Inter({ subsets: ["latin"] })
 
 // 将metadata移到单独的组件中，因为这是客户端组件
 const metadata: Metadata = {
@@ -30,7 +27,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <meta name="description" content={String(metadata.description)} />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
-      <body className={inter.className}>
+      <body className="font-sans">
         <ThemeProvider>
           <AppProvider>
             <DootaskProvider>

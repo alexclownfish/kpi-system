@@ -82,6 +82,30 @@ func performRoleRequest(router *gin.Engine, method, path, body string) *httptest
 	return response
 }
 
+func TestSearchRoleAndDepartmentCaseInsensitive(t *testing.T) {
+	fixture := setupRoleDB(t)
+	roleList := roleRouter(http.MethodGet, "/roles", fixture.admin.ID, GetRoles)
+	roles := performRoleRequest(roleList, http.MethodGet, "/roles?search=SUPER_ADMIN", "")
+	if roles.Code != http.StatusOK || !strings.Contains(roles.Body.String(), `"total":1`) {
+		t.Fatalf("role search status=%d body=%s", roles.Code, roles.Body.String())
+	}
+	roleUsers := roleRouter(http.MethodGet, "/roles/:id/users", fixture.admin.ID, GetRoleUsers)
+	users := performRoleRequest(roleUsers, http.MethodGet, fmt.Sprintf("/roles/%d/users?search=%s", fixture.superRole.ID, strings.ToUpper(fixture.admin.Email)), "")
+	if users.Code != http.StatusOK || !strings.Contains(users.Body.String(), `"total":1`) {
+		t.Fatalf("role user search status=%d body=%s", users.Code, users.Body.String())
+	}
+
+	department := models.Department{Name: "Backend-Alpha", Description: "Operations"}
+	if err := models.DB.Create(&department).Error; err != nil {
+		t.Fatal(err)
+	}
+	departmentList := roleRouter(http.MethodGet, "/departments", fixture.admin.ID, GetDepartments)
+	departments := performRoleRequest(departmentList, http.MethodGet, "/departments?search=BACKEND-ALPHA", "")
+	if departments.Code != http.StatusOK || !strings.Contains(departments.Body.String(), `"total":1`) {
+		t.Fatalf("department search status=%d body=%s", departments.Code, departments.Body.String())
+	}
+}
+
 func TestCreateRoleCompletesViewDependencyAndRejectsDuplicate(t *testing.T) {
 	fixture := setupRoleDB(t)
 	var assignPermission models.Permission

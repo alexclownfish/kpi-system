@@ -24,6 +24,16 @@ func main() {
 		}
 		return
 	}
+	if len(os.Args) > 1 && os.Args[1] == "init-schema" {
+		if strings.ToLower(strings.TrimSpace(os.Getenv("DB_DRIVER"))) != "postgres" {
+			log.Fatal("init-schema 需要 DB_DRIVER=postgres")
+		}
+		if err := models.InitSchema(); err != nil {
+			log.Fatal("PostgreSQL 数据表初始化失败: ", err)
+		}
+		log.Print("PostgreSQL 数据表初始化完成；未写入业务种子数据")
+		return
+	}
 
 	if err := handlers.InitAuthConfig(); err != nil {
 		log.Fatal("认证配置无效: ", err)
@@ -35,16 +45,21 @@ func main() {
 
 	// 初始化数据库
 	models.InitDB()
-
-	// 演示数据只能由显式开关启用，生产环境默认永不创建测试账号。
-	if strings.EqualFold(strings.TrimSpace(os.Getenv("SEED_DEMO_DATA")), "true") {
-		models.CreateTestData()
-	}
 	if err := models.EnsureSystemDefaults(); err != nil {
 		log.Fatal("系统默认配置初始化失败: ", err)
 	}
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("SEED_DEMO_DATA")), "true") {
+		log.Print("SEED_DEMO_DATA 已弃用，不再创建演示账号或模板")
+	}
+	if err := handlers.SeedHongxingCatalog(models.DB); err != nil {
+		log.Fatal("荭杏业务目录初始化失败: ", err)
+	}
 	if err := models.BootstrapSuperAdmin(); err != nil {
 		log.Fatal("超级管理员初始化失败: ", err)
+	}
+	if len(os.Args) > 1 && os.Args[1] == "init-business" {
+		log.Print("业务初始化完成")
+		return
 	}
 
 	// 设置Gin模式

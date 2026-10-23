@@ -138,6 +138,8 @@ npm run acceptance:mvp
 
 ## 📊 考核流程
 
+系统当前同时兼容历史考核和新版模板驱动流程。新版流程由 `EVALUATION_WORKFLOW_MODE=enabled` 开启：评分人来自“评分职责”配置，考核创建时冻结模板、评分人和导出布局快照；模板或职责后续变更不会改写历史考核。生产升级建议先用 `audit` 运行审计与迁移预演，再切换到 `enabled`。
+
 1. **创建考核** - HR 或主管创建考核任务，选择模板和被考核人员
 2. **员工自评** - 员工填写自我评价，对各项指标进行评分
 3. **主管评估** - 主管对员工进行评估，给出评分和反馈
@@ -303,7 +305,9 @@ CGO_ENABLED=1 go build -o kpi-server main.go
 
 ## 🗄️ 数据库
 
-系统使用 SQLite 作为数据库，数据文件位于 `server/db/kpi.db`。
+系统使用 SQLite 作为数据库。Docker Compose 中数据库文件位于后端容器的 `/app/db/kpi.db`，由命名卷 `kpi-db` 持久化保存。
+
+SQLite 是文件型数据库，不提供 MySQL/PostgreSQL 那样的数据库端口，因此 `docker-compose.yml` 不映射数据库端口是有意设计。页面测试和 E2E 测试应通过项目 HTTP 入口访问；需要查看数据时，请使用管理员“备份”功能生成 SQL 备份后下载到本地分析。不要在生产环境把正在运行的 SQLite 文件直接挂载到宿主机或通过临时容器并发读写。
 
 ### 数据表结构
 - `departments` - 部门信息

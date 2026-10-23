@@ -1,0 +1,408 @@
+[
+  {
+    "name": "login sunba@company.com",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "login lisi@company.com",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "login wangwu@company.com",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "login qianqi@company.com",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "login zhangsan@company.com",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "wrong password denied",
+    "pass": true,
+    "detail": 401
+  },
+  {
+    "name": "anonymous data denied",
+    "pass": true,
+    "detail": 401
+  },
+  {
+    "name": "employee company report denied",
+    "pass": true,
+    "detail": 403
+  },
+  {
+    "name": "employee SELF scope",
+    "pass": true,
+    "detail": [
+      5
+    ]
+  },
+  {
+    "name": "assigned ordinary employee sees own PM tasks",
+    "pass": true,
+    "detail": {
+      "status": 200,
+      "count": 2
+    }
+  },
+  {
+    "name": "assigned PM sees evaluation in list",
+    "pass": false,
+    "detail": {
+      "status": 200,
+      "ids": [
+        3
+      ]
+    }
+  },
+  {
+    "name": "other department cannot read evaluation detail",
+    "pass": true,
+    "detail": 404
+  },
+  {
+    "name": "other department cannot read comments",
+    "pass": false,
+    "detail": 200
+  },
+  {
+    "name": "other department cannot read legacy scores",
+    "pass": true,
+    "detail": 403
+  },
+  {
+    "name": "HR creates ordinary employee",
+    "pass": false,
+    "detail": {
+      "status": 403,
+      "message": "无权授予权限：提交考核"
+    }
+  },
+  {
+    "name": "published template cannot be edited",
+    "pass": true,
+    "detail": {
+      "status": 409,
+      "message": {
+        "code": "PUBLISHED_TEMPLATE_IMMUTABLE",
+        "message": "已发布或已停用模板不可直接修改，请复制为新版本"
+      }
+    }
+  },
+  {
+    "name": "position matching preview",
+    "pass": true,
+    "detail": {
+      "status": 200,
+      "data": {
+        "template": {
+          "id": 4,
+          "name": "验收闭环模板-20260930",
+          "description": "功能闭环验收临时模板",
+          "period": "monthly",
+          "department_id": 1,
+          "position_type": "高级开发工程师",
+          "version": 1,
+          "status": "published",
+          "calculation_version": "v1",
+          "is_active": true,
+          "export_layout": {
+            "version": 1,
+            "preset": "final_signoff",
+            "title": "绩效考核结果确认表",
+            "orientation": "portrait",
+            "columns": [
+              "item_name",
+              "max_score",
+              "final_score",
+              "final_comment"
+            ],
+            "show_summary": true,
+            "show_employee_opinion": true,
+            "signature_labels": [
+              "员工签字",
+              "直属主管签字",
+              "HR签字",
+              "签字日期"
+            ]
+          },
+          "created_at": "2026-09-30T10:10:57.261975919Z",
+          "updated_at": "2026-09-30T10:10:57.289436669Z",
+          "items": [
+            {
+              "id": 12,
+              "template_id": 4,
+              "name": "闭环验证指标",
+              "description": "",
+              "max_score": 100,
+              "order": 1,
+              "dimension_id": 1,
+              "item_weight": 100,
+              "composite_weight": 100,
+              "scoring_guidance": "0-100",
+              "data_source": "验收",
+              "scorer_types": [
+                "DIRECT_MANAGER"
+              ],
+              "required": true,
+              "created_at": "2026-09-30T10:10:57.275722752Z",
+              "updated_at": "2026-09-30T10:10:57.275722752Z",
+              "template": {
+                "id": 0,
+                "name": "",
+                "description": "",
+                "period": "",
+                "position_type": "",
+                "version": 0,
+                "status": "",
+                "calculation_version": "",
+                "is_active": false,
+                "export_layout": {
+                  "version": 0,
+                  "preset": "",
+                  "title": "",
+                  "orientation": "",
+                  "columns": null,
+                  "show_summary": false,
+                  "show_employee_opinion": false,
+                  "signature_labels": null
+                },
+                "created_at": "0001-01-01T00:00:00Z",
+                "updated_at": "0001-01-01T00:00:00Z"
+              }
+            }
+          ],
+          "dimensions": [
+            {
+              "id": 1,
+              "template_id": 4,
+              "name": "闭环验证维度",
+              "description": "",
+              "weight": 100,
+              "sort_order": 1,
+              "created_at": "2026-09-30T10:10:57.275091002Z",
+              "updated_at": "2026-09-30T10:10:57.275091002Z"
+            }
+          ]
+        },
+        "scorers": {
+          "DIRECT_MANAGER": {
+            "id": 1,
+            "name": "张三",
+            "email": "zhangsan@company.com"
+          }
+        }
+      }
+    }
+  },
+  {
+    "name": "canonical result equals 80",
+    "pass": true,
+    "detail": 80
+  },
+  {
+    "name": "multi-PM weighted result equals 54",
+    "pass": true,
+    "detail": 54
+  },
+  {
+    "name": "single pdf export",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "pdf download preserves port",
+    "pass": true,
+    "detail": "http://localhost:8088/api/download/exports/export_1e27a1b7-e298-4c70-9b37-17f36d076823"
+  },
+  {
+    "name": "pdf download MIME",
+    "pass": true,
+    "detail": "application/pdf"
+  },
+  {
+    "name": "single PDF A4 portrait",
+    "pass": true,
+    "detail": [
+      594.95996,
+      841.91998
+    ]
+  },
+  {
+    "name": "single PDF has total and signatures",
+    "pass": true,
+    "detail": "绩效考核结果确认表\n员工:李四 部⻔:技术部\n岗位:高级开发工程师 周期:月度 2026年9月\n模板:验收闭环模板-20260930 总分:80.00\n指标 满分 最终得分 最终评价\n闭环验证指标 100.00 80.00\n总结评价:\n员工确认意⻅:\n员工签字:________________ 直属主管签字:________________\nHR签字:________________ 签字日期:______年____月____日\n考核编号:KPI-000001 结果版本:V1\n校验码:e11f1341480ebd8a7710ef0120c8fa1fc897751844176c1bdf76fe9557eb305e"
+  },
+  {
+    "name": "single xlsx export",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "xlsx download preserves port",
+    "pass": true,
+    "detail": "http://localhost:8088/api/download/exports/export_27f70df0-2709-4574-bfe3-b0ae2aa01d81"
+  },
+  {
+    "name": "xlsx download MIME",
+    "pass": true,
+    "detail": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+  },
+  {
+    "name": "Excel has total and signature fields",
+    "pass": true,
+    "detail": "checked workbook XML"
+  },
+  {
+    "name": "batch signoff export",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "ZIP MIME",
+    "pass": true,
+    "detail": "application/zip"
+  },
+  {
+    "name": "batch includes PDF and signoff summary",
+    "pass": true,
+    "detail": [
+      "000001-李四-月度-2026年9月.pdf",
+      "签字回收汇总.xlsx"
+    ]
+  },
+  {
+    "name": "single and batch PDF text parity",
+    "pass": true,
+    "detail": "extracted complete text equality"
+  },
+  {
+    "name": "completed assessment excluded from final-score import",
+    "pass": true,
+    "detail": {
+      "status": 400,
+      "message": "没有可导入最终评分的待确认考核"
+    }
+  },
+  {
+    "name": "HR migration denied without system permission",
+    "pass": true,
+    "detail": 403
+  },
+  {
+    "name": "audit findings deterministic",
+    "pass": true,
+    "detail": {
+      "evaluations_scanned": 5,
+      "eligible": 5,
+      "manual_review": 0,
+      "errors": 0
+    }
+  },
+  {
+    "name": "trend periods unique and ordered",
+    "pass": false,
+    "detail": [
+      "2025-10",
+      "2025-11",
+      "2025-12",
+      "2026-01",
+      "2026-03",
+      "2026-03",
+      "2026-04",
+      "2026-05",
+      "2026-06",
+      "2026-07",
+      "2026-08",
+      "2026-09"
+    ]
+  },
+  {
+    "name": "create local paper-signoff fixture",
+    "pass": true,
+    "detail": 201
+  },
+  {
+    "name": "unassigned employee cannot change self score",
+    "pass": false,
+    "detail": {
+      "status": 200,
+      "message": "自评分数更新成功"
+    }
+  },
+  {
+    "name": "owner zero self score accepted",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "self evaluation advances after valid zero",
+    "pass": true,
+    "detail": {
+      "data": {
+        "previous_state": "self_evaluating",
+        "current_state": "scoring",
+        "blocking_tasks": [],
+        "result_version": 0
+      },
+      "message": "考核流程已推进",
+      "request_id": "req_91a45ec1-bfec-442d-9cf1-29ed1e9795df"
+    }
+  },
+  {
+    "name": "assigned scorer submits score",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "required scoring advances to confirmation",
+    "pass": true,
+    "detail": {
+      "data": {
+        "previous_state": "scoring",
+        "current_state": "awaiting_employee_confirmation",
+        "blocking_tasks": [],
+        "result_version": 0
+      },
+      "message": "考核流程已推进",
+      "request_id": "req_6687bac3-476e-4398-9a3b-46a88f34e998"
+    }
+  },
+  {
+    "name": "paper signoff uses exported final version",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "paper attachment registration completes evaluation",
+    "pass": true,
+    "detail": {
+      "status": 200,
+      "message": "纸质签字登记成功"
+    }
+  },
+  {
+    "name": "employee downloads identical signoff attachment",
+    "pass": true,
+    "detail": 200
+  },
+  {
+    "name": "outsider cannot read signoff attachment",
+    "pass": true,
+    "detail": 403
+  },
+  {
+    "name": "temporary paper evaluation cleanup",
+    "pass": true,
+    "detail": 200
+  }
+]

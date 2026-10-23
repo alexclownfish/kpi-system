@@ -1,10 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -12,6 +15,7 @@ import (
 	"dootask-kpi-server/utils"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +30,18 @@ func CreateItem(c *gin.Context) {
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
+		return
+	}
+	if item.TemplateID == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "必须指定所属模板"})
+		return
+	}
+	if err := ensureTemplateDraftForMutation(models.DB, item.TemplateID); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "模板不存在"})
+		} else {
+			respondError(c, http.StatusConflict, "PUBLISHED_TEMPLATE_IMMUTABLE", err.Error(), nil)
+		}
 		return
 	}
 
@@ -63,7 +79,6 @@ func GetItem(c *gin.Context) {
 		})
 		return
 	}
-
 	c.JSON(http.StatusOK, gin.H{
 		"data": item,
 	})
@@ -86,6 +101,10 @@ func UpdateItem(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "KPI项目不存在",
 		})
+		return
+	}
+	if err := ensureTemplateDraftForMutation(models.DB, item.TemplateID); err != nil {
+		respondError(c, http.StatusConflict, "PUBLISHED_TEMPLATE_IMMUTABLE", err.Error(), nil)
 		return
 	}
 
@@ -135,6 +154,15 @@ func DeleteItem(c *gin.Context) {
 		return
 	}
 
+	var item models.KPIItem
+	if err := models.DB.First(&item, itemId).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "KPI项目不存在"})
+		return
+	}
+	if err := ensureTemplateDraftForMutation(models.DB, item.TemplateID); err != nil {
+		respondError(c, http.StatusConflict, "PUBLISHED_TEMPLATE_IMMUTABLE", err.Error(), nil)
+		return
+	}
 	result := models.DB.Delete(&models.KPIItem{}, itemId)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -178,6 +206,14 @@ func GetEvaluations(c *gin.Context) {
 	// 构建查询
 	userID := c.GetUint("user_id")
 	query := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores"), userID)
+	assignedOnly := c.Query("assigned_to_me") == "true"
+	filterAssigned := func(query *gorm.DB) *gorm.DB {
+		if !assignedOnly {
+			return query
+		}
+		return query.Where("kpi_evaluations.status IN ? AND kpi_evaluations.id IN (SELECT evaluation_id FROM evaluation_scoring_tasks WHERE scorer_user_id = ? AND status IN ?)", []string{"scoring", "awaiting_review"}, userID, []string{"pending", "in_progress", "rejected"})
+	}
+	query = filterAssigned(query)
 
 	// 添加筛选条件
 	if status != "" {
@@ -216,6 +252,7 @@ func GetEvaluations(c *gin.Context) {
 		statsQuery := ApplyEvaluationScope(models.DB.Model(&models.KPIEvaluation{}), userID).
 			Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
 			Where("employees.is_active = ?", true)
+		statsQuery = filterAssigned(statsQuery)
 		if employeeID != "" {
 			statsQuery = statsQuery.Where("kpi_evaluations.employee_id = ?", employeeID)
 		}
@@ -260,8 +297,8 @@ func GetEvaluations(c *gin.Context) {
 		return
 	}
 
-	// 待处理数（pending, self_evaluated, manager_evaluated, pending_confirm）
-	if err := buildStatsQuery().Where("kpi_evaluations.status IN ?", []string{"pending", "self_evaluated", "manager_evaluated", "pending_confirm"}).Count(&statsPending).Error; err != nil {
+	// 待处理数同时覆盖旧流程和新版流程状态。
+	if err := buildStatsQuery().Where("kpi_evaluations.status IN ?", []string{"pending", "draft", "self_evaluating", "self_evaluated", "scoring", "awaiting_review", "manager_evaluated", "pending_confirm", "awaiting_employee_confirmation", "rejected"}).Count(&statsPending).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取统计数据失败",
 			"message": err.Error(),
@@ -278,11 +315,11 @@ func GetEvaluations(c *gin.Context) {
 		return
 	}
 
-	// 平均分（只计算有分数的评估）
+	// Only finalized assessments contribute; zero is a valid final score.
 	var avgResult struct {
 		AvgScore float64
 	}
-	if err := buildStatsQuery().Where("kpi_evaluations.total_score > 0").Select("COALESCE(AVG(kpi_evaluations.total_score), 0) as avg_score").Scan(&avgResult).Error; err != nil {
+	if err := buildStatsQuery().Where("kpi_evaluations.status = ?", "completed").Select("COALESCE(AVG(kpi_evaluations.total_score), 0) as avg_score").Scan(&avgResult).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取统计数据失败",
 			"message": err.Error(),
@@ -293,7 +330,8 @@ func GetEvaluations(c *gin.Context) {
 
 	// 获取总数（用于分页，受 status 筛选影响）
 	var total int64
-	countQuery := models.DB.Model(&models.KPIEvaluation{})
+	countQuery := ApplyEvaluationScope(models.DB.Model(&models.KPIEvaluation{}), userID)
+	countQuery = filterAssigned(countQuery)
 	if status != "" {
 		countQuery = countQuery.Where("status = ?", status)
 	}
@@ -373,6 +411,111 @@ func CreateEvaluation(c *gin.Context) {
 		})
 		return
 	}
+	if err := validateEvaluationPeriod(evaluation); err != nil {
+		respondError(c, http.StatusBadRequest, "INVALID_EVALUATION_PERIOD", err.Error(), nil)
+		return
+	}
+	if evaluation.TotalScore != 0 || (evaluation.Status != "" && evaluation.Status != "pending" && evaluation.Status != workflowStateSelfEvaluating) {
+		respondError(c, http.StatusBadRequest, "SERVER_OWNED_RESULT", "新建考核不能指定最终分数或已完成状态", nil)
+		return
+	}
+	projectName := strings.TrimSpace(evaluation.ProjectName)
+	allocationRatio := evaluation.AllocationRatio
+	if allocationRatio != nil && (math.IsNaN(*allocationRatio) || math.IsInf(*allocationRatio, 0) || *allocationRatio < 0 || *allocationRatio > 1) {
+		respondError(c, http.StatusBadRequest, "INVALID_ALLOCATION_RATIO", "项目投入占比必须为0到1之间的有限数值", nil)
+		return
+	}
+	// Retain only authoring inputs. Embedded associations, IDs, result and
+	// snapshot metadata are server-owned and must never be mass-assigned.
+	evaluation = models.KPIEvaluation{
+		EmployeeID: evaluation.EmployeeID, TemplateID: evaluation.TemplateID,
+		Period: evaluation.Period, Year: evaluation.Year, Month: evaluation.Month, Quarter: evaluation.Quarter,
+		ProjectName: projectName, AllocationRatio: allocationRatio,
+	}
+	if !CanAccessEmployee(c.GetUint("user_id"), evaluation.EmployeeID) {
+		respondError(c, http.StatusForbidden, "ASSESSMENT_SCOPE_FORBIDDEN", "被考核员工超出数据范围", nil)
+		return
+	}
+	var employee models.Employee
+	if err := models.DB.First(&employee, evaluation.EmployeeID).Error; err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "被考核员工不存在"})
+		return
+	}
+	if !employee.IsActive {
+		respondError(c, http.StatusBadRequest, "EMPLOYEE_INACTIVE", "不能为已停用员工创建考核", nil)
+		return
+	}
+	// 新流程不再要求前端硬编码模板 ID；按员工部门、岗位和周期自动匹配。
+	var template models.KPITemplate
+	var err error
+	if evaluation.TemplateID == 0 {
+		template, err = findPublishedTemplate(models.DB, employee, evaluation.Period)
+	} else {
+		template, err = loadCalculationTemplate(models.DB, evaluation.TemplateID)
+		if err == nil && (template.Status != "published" || !template.IsActive) {
+			err = fmt.Errorf("所选模板不是已发布模板")
+		}
+	}
+	if err != nil {
+		status := http.StatusBadRequest
+		code := "TEMPLATE_NOT_FOUND"
+		if strings.Contains(err.Error(), "TEMPLATE_MATCH_AMBIGUOUS") {
+			status = http.StatusConflict
+			code = "TEMPLATE_MATCH_AMBIGUOUS"
+		}
+		respondError(c, status, code, "无法匹配考核模板", err.Error())
+		return
+	}
+	if !templateMatchesEmployee(models.DB, template, employee, evaluation.Period) {
+		respondError(c, http.StatusBadRequest, "TEMPLATE_SCOPE_MISMATCH", "模板的部门、岗位或周期与员工考核不匹配", nil)
+		return
+	}
+	workflowWrites := models.EvaluationWorkflowWritesEnabled()
+	if template.CalculationVersion == canonicalCalculationVersion && !workflowWrites {
+		respondError(c, http.StatusConflict, "WORKFLOW_WRITES_DISABLED", "当前为 "+models.EvaluationWorkflowMode()+" 模式，新模板考核需管理员显式启用 EVALUATION_WORKFLOW_MODE=enabled", nil)
+		return
+	}
+	var snapshot string
+	if workflowWrites {
+		assignments, resolveErr := resolveTemplateScoringAssignments(models.DB, employee, template)
+		err = resolveErr
+		if err == nil {
+			snapshot, err = buildWorkflowTemplateSnapshot(template, assignments)
+		}
+	} else {
+		// Audit/disabled rollout modes preserve the legacy creation path. New
+		// workflow writes only begin after an administrator explicitly enables
+		// EVALUATION_WORKFLOW_MODE=enabled.
+		var scorers map[string]uint
+		scorers, err = resolveTemplateScorers(models.DB, employee, template)
+		if err == nil {
+			snapshot, err = buildEvaluationTemplateSnapshotWithScorers(template, scorers)
+		}
+	}
+	if err != nil {
+		var resolutionErr *scorerResolutionError
+		if errors.As(err, &resolutionErr) {
+			respondError(c, http.StatusUnprocessableEntity, "SCORER_RESOLUTION_INCOMPLETE", "无法解析完整评分职责", gin.H{"missing": resolutionErr.Missing})
+			return
+		}
+		c.JSON(http.StatusBadRequest, gin.H{"error": "无法解析评分人", "message": err.Error()})
+		return
+	}
+	evaluation.TemplateID = template.ID
+	evaluation.TemplateVersion = template.Version
+	evaluation.CalculationVersion = template.CalculationVersion
+	if workflowWrites {
+		evaluation.CalculationVersion = canonicalCalculationVersion
+		evaluation.WorkSummaryRequired = true
+	}
+	evaluation.TemplateSnapshotJSON = snapshot
+	if evaluation.Status == "" {
+		if workflowWrites {
+			evaluation.Status = "self_evaluating"
+		} else {
+			evaluation.Status = "pending"
+		}
+	}
 
 	// 开始数据库事务
 	tx := models.DB.Begin()
@@ -390,7 +533,28 @@ func CreateEvaluation(c *gin.Context) {
 
 	// 获取模板的所有KPI项目
 	var items []models.KPIItem
-	tx.Where("template_id = ?", evaluation.TemplateID).Find(&items)
+	if workflowWrites {
+		parsedSnapshot, parseErr := parseEvaluationSnapshot(evaluation.TemplateSnapshotJSON)
+		if parseErr != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取新版模板快照失败", "message": parseErr.Error()})
+			return
+		}
+		for _, item := range parsedSnapshot.Items {
+			items = append(items, models.KPIItem{ID: item.ID, Name: item.Name, Description: item.Description, MaxScore: item.MaxScore, ItemWeight: item.ItemWeight, CompositeWeight: item.CompositeWeight, Required: item.Required, ScoringGuidance: item.ScoringGuidance, DataSource: item.DataSource})
+		}
+	} else if err := json.Unmarshal([]byte(evaluation.TemplateSnapshotJSON), &struct {
+		Items *[]models.KPIItem `json:"items"`
+	}{Items: &items}); err != nil || len(items) == 0 {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取模板快照失败"})
+		return
+	}
+	if len(items) == 0 {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "模板快照没有考核指标"})
+		return
+	}
 
 	// 为每个KPI项目创建评分记录
 	for _, item := range items {
@@ -407,8 +571,28 @@ func CreateEvaluation(c *gin.Context) {
 			return
 		}
 	}
+	if workflowWrites {
+		parsedSnapshot, parseErr := parseEvaluationSnapshot(evaluation.TemplateSnapshotJSON)
+		if parseErr != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取新版模板快照失败", "message": parseErr.Error()})
+			return
+		}
+		if _, taskErr := generateEvaluationScoringTasks(tx, evaluation, parsedSnapshot); taskErr != nil {
+			tx.Rollback()
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建评分任务失败", "message": taskErr.Error()})
+			return
+		}
+	} else if _, invitationErr := ensureTemplateInvitations(tx, evaluation, c.GetUint("user_id")); invitationErr != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建模板评分任务失败", "message": invitationErr.Error()})
+		return
+	}
 
-	tx.Commit()
+	if err := tx.Commit().Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "ASSESSMENT_CREATE_FAILED", "创建考核失败", nil)
+		return
+	}
 
 	// 获取完整的评估信息
 	models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores").First(&evaluation, evaluation.ID)
@@ -435,10 +619,49 @@ func CreateEvaluation(c *gin.Context) {
 	operatorID := c.GetUint("user_id")
 	GetNotificationService().SendNotification(operatorID, EventEvaluationCreated, &evaluation)
 
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "评估创建成功",
-		"data":    evaluation,
-	})
+	response := gin.H{"evaluation": evaluation}
+	if parsed, parseErr := parseEvaluationSnapshot(evaluation.TemplateSnapshotJSON); parseErr == nil {
+		response["template_version"] = parsed.TemplateVersion
+		response["source_workbook_sha256"] = parsed.SourceSHA256
+		response["scorer_snapshot"] = parsed.ResolvedScorers
+		response["signoff_snapshot"] = parsed.SignoffRules
+		response["calculation_version"] = parsed.CalculationVersion
+		response["snapshot_checksum"] = parsed.Checksum
+	}
+	// Keep the historical `data.id`, `data.status`, ... shape while exposing
+	// immutable snapshot metadata for clients that need an audit link.
+	data := map[string]any{}
+	rawEvaluation, _ := json.Marshal(evaluation)
+	_ = json.Unmarshal(rawEvaluation, &data)
+	for key, value := range response {
+		if key != "evaluation" {
+			data[key] = value
+		}
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": "评估创建成功", "data": data})
+}
+
+func validateEvaluationPeriod(evaluation models.KPIEvaluation) error {
+	if evaluation.Year < 1900 || evaluation.Year > 9999 {
+		return errors.New("考核年份必须在1900到9999之间")
+	}
+	switch evaluation.Period {
+	case "monthly":
+		if evaluation.Month == nil || *evaluation.Month < 1 || *evaluation.Month > 12 || evaluation.Quarter != nil {
+			return errors.New("月度考核必须提供1到12的月份，且不能提供季度")
+		}
+	case "quarterly":
+		if evaluation.Quarter == nil || *evaluation.Quarter < 1 || *evaluation.Quarter > 4 || evaluation.Month != nil {
+			return errors.New("季度考核必须提供1到4的季度，且不能提供月份")
+		}
+	case "yearly":
+		if evaluation.Month != nil || evaluation.Quarter != nil {
+			return errors.New("年度考核不能提供月份或季度")
+		}
+	default:
+		return errors.New("考核周期必须为monthly、quarterly或yearly")
+	}
+	return nil
 }
 
 // 获取单个评估
@@ -496,6 +719,32 @@ func UpdateEvaluation(c *gin.Context) {
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
+		return
+	}
+	if isNewWorkflowEvaluation(evaluation) {
+		// New workflow assessments advance through the backend state machine and
+		// derive totals from scoring tasks. Keep this compatibility endpoint
+		// limited to the non-state metadata that older clients may still send.
+		if updateData.Status != "" || updateData.TotalScore != 0 || updateData.EmployeeID != 0 || updateData.TemplateID != 0 {
+			respondError(c, http.StatusConflict, "WORKFLOW_UPDATE_NOT_ALLOWED", "新版考核不能直接修改状态或总分，请使用流程推进和评分任务接口", nil)
+			return
+		}
+		updates := map[string]any{"final_comment": updateData.FinalComment, "has_objection": updateData.HasObjection, "objection_reason": updateData.ObjectionReason}
+		if projectName := strings.TrimSpace(updateData.ProjectName); projectName != "" {
+			updates["project_name"] = projectName
+		}
+		if updateData.AllocationRatio != nil {
+			if math.IsNaN(*updateData.AllocationRatio) || math.IsInf(*updateData.AllocationRatio, 0) || *updateData.AllocationRatio < 0 || *updateData.AllocationRatio > 1 {
+				respondError(c, http.StatusBadRequest, "INVALID_ALLOCATION_RATIO", "项目投入占比必须为0到1之间的有限数值", nil)
+				return
+			}
+			updates["allocation_ratio"] = *updateData.AllocationRatio
+		}
+		if err := models.DB.Model(&evaluation).Updates(updates).Error; err != nil {
+			respondError(c, http.StatusInternalServerError, "WORKFLOW_UPDATE_FAILED", "更新考核信息失败", nil)
+			return
+		}
+		respondData(c, http.StatusOK, evaluation, "考核信息已更新")
 		return
 	}
 	if updateData.Status == "completed" {
@@ -773,7 +1022,13 @@ func DeleteEvaluation(c *gin.Context) {
 		return
 	}
 
-	// 在删除前获取评估信息用于通知
+	userID := c.GetUint("user_id")
+	if !CanAccessEvaluation(userID, uint(evaluationId)) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "该评估超出数据范围"})
+		return
+	}
+
+	// 在删除前获取评估信息用于通知和清理纸质签字附件
 	var evaluation models.KPIEvaluation
 	if err := models.DB.Preload("Employee").First(&evaluation, evaluationId).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
@@ -782,20 +1037,150 @@ func DeleteEvaluation(c *gin.Context) {
 		return
 	}
 
-	// 删除相关的评分记录
-	models.DB.Where("evaluation_id = ?", evaluationId).Delete(&models.KPIScore{})
-
-	// 删除相关的邀请记录
-	models.DB.Where("evaluation_id = ?", evaluationId).Delete(&models.EvaluationInvitation{})
-
-	result := models.DB.Delete(&models.KPIEvaluation{}, evaluationId)
-	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "删除评估失败",
-			"message": result.Error.Error(),
-		})
+	type attachmentBackup struct {
+		original string
+		staged   string
+		content  []byte
+		mode     os.FileMode
+	}
+	var backups []attachmentBackup
+	stageDir := ""
+	tx := models.DB.Begin()
+	if tx.Error != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": tx.Error.Error()})
 		return
 	}
+	committed := false
+	defer func() {
+		if committed {
+			return
+		}
+		tx.Rollback()
+		for _, backup := range backups {
+			if _, statErr := os.Stat(backup.original); statErr == nil {
+				continue
+			}
+			if _, statErr := os.Stat(backup.staged); statErr == nil {
+				if renameErr := os.Rename(backup.staged, backup.original); renameErr == nil {
+					continue
+				}
+			}
+			_ = os.WriteFile(backup.original, backup.content, backup.mode)
+		}
+		if stageDir != "" {
+			_ = os.RemoveAll(stageDir)
+		}
+	}()
+
+	var confirmations []models.EvaluationConfirmation
+	if err = tx.Where("evaluation_id = ?", evaluationId).Find(&confirmations).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": err.Error()})
+		return
+	}
+	attachmentNames := make([]string, 0, len(confirmations))
+	for _, confirmation := range confirmations {
+		if name := strings.TrimSpace(filepath.Base(confirmation.AttachmentStoredName)); name != "" && name != "." {
+			attachmentNames = append(attachmentNames, name)
+		}
+	}
+	var supplements []models.EvaluationSignoffSupplement
+	if err = tx.Where("evaluation_id = ?", evaluationId).Find(&supplements).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": err.Error()})
+		return
+	}
+	for _, supplement := range supplements {
+		if name := strings.TrimSpace(filepath.Base(supplement.AttachmentStoredName)); name != "" && name != "." {
+			attachmentNames = append(attachmentNames, name)
+		}
+	}
+	if len(attachmentNames) > 0 {
+		uploadDir := signoffUploadDir()
+		stageDir = filepath.Join(uploadDir, ".deleting-"+uuid.NewString())
+		if err = os.MkdirAll(stageDir, 0750); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估附件失败", "message": err.Error()})
+			return
+		}
+		for _, name := range attachmentNames {
+			original := filepath.Join(uploadDir, name)
+			info, statErr := os.Stat(original)
+			if errors.Is(statErr, os.ErrNotExist) {
+				continue
+			}
+			if statErr != nil || !info.Mode().IsRegular() {
+				if statErr == nil {
+					statErr = fmt.Errorf("附件不是普通文件: %s", name)
+				}
+				err = statErr
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估附件失败", "message": err.Error()})
+				return
+			}
+			content, readErr := os.ReadFile(original)
+			if readErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估附件失败", "message": readErr.Error()})
+				return
+			}
+			staged := filepath.Join(stageDir, uuid.NewString())
+			if renameErr := os.Rename(original, staged); renameErr != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估附件失败", "message": renameErr.Error()})
+				return
+			}
+			backups = append(backups, attachmentBackup{original: original, staged: staged, content: content, mode: info.Mode().Perm()})
+		}
+	}
+
+	// Delete children explicitly because SQLite does not enable foreign-key
+	// cascades for every existing deployment. Keep the operation transactional
+	// so a failed child delete cannot leave an orphaned assessment.
+	childDeletes := []struct {
+		model any
+		where string
+		args  []any
+	}{
+		{&models.EvaluationScoringTask{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.EvaluationCalculationResult{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.EvaluationResultSnapshot{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.EvaluationConfirmation{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.EvaluationSignoffSupplement{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.EvaluationComment{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.KPIScore{}, "evaluation_id = ?", []any{evaluationId}},
+		{&models.InvitedScore{}, "invitation_id IN (SELECT id FROM evaluation_invitations WHERE evaluation_id = ?)", []any{evaluationId}},
+		{&models.EvaluationInvitation{}, "evaluation_id = ?", []any{evaluationId}},
+	}
+	for _, child := range childDeletes {
+		if result := tx.Where(child.where, child.args...).Delete(child.model); result.Error != nil {
+			err = result.Error
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": err.Error()})
+			return
+		}
+	}
+	if result := tx.Delete(&models.KPIEvaluation{}, evaluationId); result.Error != nil || result.RowsAffected != 1 {
+		err = result.Error
+		if err == nil {
+			err = gorm.ErrRecordNotFound
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{"error": "评估不存在"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": err.Error()})
+		return
+	}
+	for _, backup := range backups {
+		if removeErr := os.Remove(backup.staged); removeErr != nil && !errors.Is(removeErr, os.ErrNotExist) {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估附件失败", "message": removeErr.Error()})
+			return
+		}
+	}
+	if err = tx.Commit().Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "删除评估失败", "message": err.Error()})
+		return
+	}
+	committed = true
+	if stageDir != "" {
+		_ = os.RemoveAll(stageDir)
+	}
+
+	RecordAuditDetails(c, "delete_evaluation", "evaluation", strconv.FormatUint(evaluationId, 10), "SUCCESS", fmt.Sprintf("attachments=%d", len(backups)))
 
 	// 发送实时通知
 	operatorID := c.GetUint("user_id")
@@ -847,7 +1232,11 @@ func GetPendingEvaluations(c *gin.Context) {
 	var evaluations []models.KPIEvaluation
 
 	// 获取需要当前员工处理的评估
-	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template"), c.GetUint("user_id")).Where("kpi_evaluations.employee_id = ? AND status IN ?", empId, []string{"pending", "self_evaluated"}).Find(&evaluations)
+	if uint(empId) != c.GetUint("user_id") {
+		respondError(c, http.StatusForbidden, "ASSESSMENT_SCOPE_FORBIDDEN", "只能查询自己的待办考核", nil)
+		return
+	}
+	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template"), uint(empId)).Where("((kpi_evaluations.employee_id = ? AND status IN ?) OR (status IN ? AND kpi_evaluations.id IN (SELECT evaluation_id FROM evaluation_scoring_tasks WHERE scorer_user_id = ? AND status IN ?)))", empId, []string{"pending", "self_evaluating", "pending_confirm", "awaiting_employee_confirmation"}, []string{"scoring", "awaiting_review"}, empId, []string{"pending", "in_progress", "rejected"}).Find(&evaluations)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取待处理评估失败",
@@ -870,11 +1259,17 @@ func GetPendingCountEvaluations(c *gin.Context) {
 
 	// 所有角色：自己的待自评 + 待确认
 	if err := models.DB.Model(&models.KPIEvaluation{}).
-		Where("employee_id = ? AND status IN ?", userID, []string{"pending", "pending_confirm"}).
+		Where("employee_id = ? AND status IN ?", userID, []string{"pending", "self_evaluating", "pending_confirm", "awaiting_employee_confirmation"}).
 		Count(&totalCount).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取待确认评估数量失败"})
 		return
 	}
+	var assignedCount int64
+	if err := models.DB.Model(&models.KPIEvaluation{}).Where("status IN ? AND id IN (SELECT evaluation_id FROM evaluation_scoring_tasks WHERE scorer_user_id = ? AND status IN ?)", []string{"scoring", "awaiting_review"}, userID, []string{"pending", "in_progress", "rejected"}).Count(&assignedCount).Error; err != nil {
+		respondError(c, http.StatusInternalServerError, "PENDING_COUNT_FAILED", "获取评分待办数量失败", nil)
+		return
+	}
+	totalCount += assignedCount
 
 	// 具备评分权限的用户：增加其数据范围内的待评分记录。
 	if UserHasPermission(userID, "assessment:review") {
@@ -929,6 +1324,23 @@ func GetEvaluationScores(c *gin.Context) {
 		})
 		return
 	}
+	var evaluation models.KPIEvaluation
+	if models.DB.First(&evaluation, evalId).Error == nil && isNewWorkflowEvaluation(evaluation) {
+		snapshot, err := parseWorkflowSnapshotForEvaluation(evaluation)
+		if err != nil {
+			respondError(c, http.StatusConflict, "SNAPSHOT_INVALID", err.Error(), nil)
+			return
+		}
+		items := map[uint]workflowSnapshotItem{}
+		for _, item := range snapshot.Items {
+			items[item.ID] = item
+		}
+		for i := range scores {
+			if item, ok := items[scores[i].ItemID]; ok {
+				scores[i].Item = models.KPIItem{ID: item.ID, Name: item.Name, Description: item.Description, MaxScore: item.MaxScore, Required: item.Required, ItemWeight: item.ItemWeight, CompositeWeight: item.CompositeWeight, ScorerTypes: item.ScorerTypes}
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"data":  scores,
@@ -948,15 +1360,28 @@ func UpdateSelfScore(c *gin.Context) {
 	}
 
 	var score models.KPIScore
-	result := models.DB.Preload("Evaluation.Employee").First(&score, scoreId)
+	result := models.DB.Preload("Evaluation.Employee").Preload("Item").First(&score, scoreId)
 	if result.Error != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "评分记录不存在",
 		})
 		return
 	}
-	if err := ensureEvaluationNotCompleted(score.EvaluationID); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if score.Evaluation.EmployeeID != c.GetUint("user_id") {
+		respondError(c, http.StatusForbidden, "SELF_SCORE_FORBIDDEN", "只能填写自己的考核自评", nil)
+		return
+	}
+	weighted := isNewWorkflowEvaluation(score.Evaluation)
+	editableState := "pending"
+	if weighted {
+		editableState = workflowStateSelfEvaluating
+	}
+	if score.Evaluation.Status != editableState {
+		respondError(c, http.StatusConflict, "SELF_SCORE_LOCKED", "当前考核已不在自评阶段，不能修改自评分数", nil)
+		return
+	}
+	if weighted && score.Evaluation.WorkSummaryRequired && score.Evaluation.WorkSummarySubmittedAt == nil {
+		respondError(c, http.StatusConflict, "WORK_SUMMARY_REQUIRED", "请先提交工作总结与后续计划", nil)
 		return
 	}
 
@@ -973,9 +1398,31 @@ func UpdateSelfScore(c *gin.Context) {
 		return
 	}
 
-	// 检查是否是第一次保存自评分数（开始自评时）
-	// 如果之前没有自评分数，且现在要保存自评分数，则检查是否有直属上级
-	if score.SelfScore == nil && updateData.SelfScore != nil {
+	maxScore := score.Item.MaxScore
+	if weighted {
+		snapshot, snapshotErr := parseWorkflowSnapshotForEvaluation(score.Evaluation)
+		if snapshotErr != nil {
+			respondError(c, http.StatusConflict, "SNAPSHOT_INVALID", snapshotErr.Error(), nil)
+			return
+		}
+		found := false
+		for _, item := range snapshot.Items {
+			if item.ID == score.ItemID {
+				maxScore = item.MaxScore
+				found = true
+				break
+			}
+		}
+		if !found {
+			respondError(c, http.StatusConflict, "SNAPSHOT_ITEM_MISSING", "自评指标不在考核快照内", nil)
+			return
+		}
+	}
+	if updateData.SelfScore != nil && (math.IsNaN(*updateData.SelfScore) || math.IsInf(*updateData.SelfScore, 0) || *updateData.SelfScore < 0 || *updateData.SelfScore > maxScore) {
+		respondError(c, http.StatusBadRequest, "SCORE_OUT_OF_RANGE", fmt.Sprintf("评分必须在0到%g之间", maxScore), nil)
+		return
+	}
+	if !weighted && score.SelfScore == nil && updateData.SelfScore != nil {
 		// 检查被评估员工是否有直属上级（所有角色都需要检查）
 		if score.Evaluation.Employee.ManagerID == nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -985,7 +1432,7 @@ func UpdateSelfScore(c *gin.Context) {
 		}
 	}
 
-	result = models.DB.Model(&score).Updates(map[string]interface{}{
+	result = models.DB.Model(&score).Where("EXISTS (SELECT 1 FROM kpi_evaluations WHERE kpi_evaluations.id = kpi_scores.evaluation_id AND employee_id = ? AND status = ?)", c.GetUint("user_id"), editableState).Updates(map[string]interface{}{
 		"self_score":   updateData.SelfScore,
 		"self_comment": updateData.SelfComment,
 	})
@@ -997,6 +1444,11 @@ func UpdateSelfScore(c *gin.Context) {
 		})
 		return
 	}
+	if result.RowsAffected == 0 {
+		respondError(c, http.StatusConflict, "SELF_SCORE_LOCKED", "考核状态已变化，请刷新后重试", nil)
+		return
+	}
+	score.SelfScore, score.SelfComment = updateData.SelfScore, updateData.SelfComment
 
 	// 发送实时通知
 	operatorID := c.GetUint("user_id")
@@ -1213,8 +1665,8 @@ func SubmitObjection(c *gin.Context) {
 		return
 	}
 
-	// 检查状态：只有在待确认状态才能提交异议
-	if evaluation.Status != "pending_confirm" {
+	// 检查状态：旧流程只能在 pending_confirm 提交，新流程只能在统一确认态提交。
+	if !objectionSubmissionAllowed(evaluation) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "只有在待确认状态才能提交异议",
 		})
@@ -1242,10 +1694,20 @@ func SubmitObjection(c *gin.Context) {
 	}
 
 	// 更新评估，添加异议
-	result = models.DB.Model(&evaluation).Updates(map[string]interface{}{
+	objectionUpdates := map[string]interface{}{
 		"has_objection":    true,
 		"objection_reason": objectionData.Reason,
-	})
+	}
+	if isNewWorkflowEvaluation(evaluation) {
+		objectionUpdates["status"] = workflowStateRejected
+	}
+	result = models.DB.Model(&models.KPIEvaluation{}).
+		Where("id = ? AND has_objection = ? AND status = ?", evaluation.ID, false, evaluation.Status).
+		Updates(objectionUpdates)
+	if result.Error == nil && result.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "该考核状态已变化或异议已提交，请刷新后重试"})
+		return
+	}
 
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1254,6 +1716,7 @@ func SubmitObjection(c *gin.Context) {
 		})
 		return
 	}
+	RecordAuditDetails(c, "submit_objection", "evaluation", strconv.FormatUint(evaluationId, 10), "SUCCESS", "workflow_state="+evaluation.Status)
 
 	// 重新加载评估数据
 	models.DB.Preload("Employee").Preload("Employee.Manager").Preload("Template").First(&evaluation, evaluationId)
@@ -1337,16 +1800,24 @@ func HandleObjection(c *gin.Context) {
 	}
 
 	// 检查是否有异议
+	if !CanAccessEvaluation(c.GetUint("user_id"), evaluation.ID) {
+		respondError(c, http.StatusForbidden, "ASSESSMENT_SCOPE_FORBIDDEN", "该考核超出数据范围", nil)
+		return
+	}
 	if !evaluation.HasObjection {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "该评估没有异议需要处理",
 		})
 		return
 	}
+	if !objectionHandlingAllowed(evaluation) {
+		c.JSON(http.StatusConflict, gin.H{"error": "当前考核状态不能处理异议"})
+		return
+	}
 
 	var handleData struct {
-		TotalScore   float64 `json:"total_score" binding:"required"`
-		FinalComment string  `json:"final_comment" binding:"required"`
+		TotalScore   *float64 `json:"total_score"`
+		FinalComment string   `json:"final_comment" binding:"required"`
 	}
 
 	if err := c.ShouldBindJSON(&handleData); err != nil {
@@ -1356,13 +1827,62 @@ func HandleObjection(c *gin.Context) {
 		})
 		return
 	}
+	if !isNewWorkflowEvaluation(evaluation) && handleData.TotalScore == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "旧流程处理异议必须提供总分"})
+		return
+	}
+
+	if isNewWorkflowEvaluation(evaluation) {
+		// 新流程的异议只改变流程状态和说明，不能由客户端覆盖权威计算总分。
+		confirmationCandidate := evaluation
+		confirmationCandidate.Status = workflowStateAwaitingEmployeeConfirmation
+		confirmationCandidate.HasObjection = false
+		if failure := guardEvaluationConfirmation(models.DB, confirmationCandidate); failure != nil {
+			respondError(c, failure.Status, failure.Code, failure.Message, failure.Details)
+			return
+		}
+		tx := models.DB.Begin()
+		if tx.Error != nil {
+			respondError(c, http.StatusInternalServerError, "OBJECTION_HANDLE_FAILED", "处理异议失败", nil)
+			return
+		}
+		if _, _, calcErr := persistCanonicalEvaluationResult(tx, evaluation.ID, c.GetUint("user_id")); calcErr != nil {
+			tx.Rollback()
+			respondError(c, http.StatusUnprocessableEntity, "RESULT_CALCULATION_FAILED", calcErr.Error(), nil)
+			return
+		}
+		update := tx.Model(&models.KPIEvaluation{}).Where("id = ? AND status = ? AND has_objection = ?", evaluation.ID, workflowStateRejected, true).Updates(map[string]any{
+			"has_objection": false,
+			"final_comment": handleData.FinalComment,
+			"status":        workflowStateAwaitingEmployeeConfirmation,
+		})
+		if update.Error != nil || update.RowsAffected == 0 || tx.Commit().Error != nil {
+			tx.Rollback()
+			if update.Error == nil && update.RowsAffected == 0 {
+				respondError(c, http.StatusConflict, "OBJECTION_STATE_CONFLICT", "异议已被其他操作处理，请刷新后重试", nil)
+				return
+			}
+			respondError(c, http.StatusInternalServerError, "OBJECTION_HANDLE_FAILED", "处理异议失败", nil)
+			return
+		}
+		models.DB.Preload("Employee").Preload("Template").First(&evaluation, evaluation.ID)
+		RecordAuditDetails(c, "handle_objection", "evaluation", strconv.FormatUint(evaluationId, 10), "SUCCESS", "workflow=awaiting_employee_confirmation;client_total_ignored=true")
+		respondData(c, http.StatusOK, evaluation, "异议已处理，考核已回到员工确认")
+		return
+	}
 
 	// 更新评估：处理异议，清除异议状态，更新最终得分和处理原因
-	result = models.DB.Model(&evaluation).Updates(map[string]interface{}{
-		"has_objection": false,
-		"total_score":   handleData.TotalScore,
-		"final_comment": handleData.FinalComment,
-	})
+	result = models.DB.Model(&models.KPIEvaluation{}).
+		Where("id = ? AND status = ? AND has_objection = ?", evaluation.ID, "pending_confirm", true).
+		Updates(map[string]interface{}{
+			"has_objection": false,
+			"total_score":   *handleData.TotalScore,
+			"final_comment": handleData.FinalComment,
+		})
+	if result.Error == nil && result.RowsAffected == 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "该考核状态已变化，请刷新后重试"})
+		return
+	}
 
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -1371,6 +1891,7 @@ func HandleObjection(c *gin.Context) {
 		})
 		return
 	}
+	RecordAuditDetails(c, "handle_objection", "evaluation", strconv.FormatUint(evaluationId, 10), "SUCCESS", "workflow=legacy_pending_confirm")
 
 	// 重新加载评估数据
 	models.DB.Preload("Employee").Preload("Template").First(&evaluation, evaluationId)
@@ -1387,7 +1908,7 @@ func HandleObjection(c *gin.Context) {
 			"**你的绩效异议已处理，请重新确认**\n- 考核模板：%s\n- 考核周期：%s\n- 调整后总分：%.2f\n- 处理说明：%s\n\n> <div class=\"open-micro-app\" data-app-config='%s'>查看详情：点击查看详情</div>",
 			evaluation.Template.Name,
 			periodValue,
-			handleData.TotalScore,
+			*handleData.TotalScore,
 			handleData.FinalComment,
 			appConfigJSON,
 		)
@@ -1403,7 +1924,7 @@ func HandleObjection(c *gin.Context) {
 				employee.Name,
 				evaluation.Template.Name,
 				periodValue,
-				handleData.TotalScore,
+				*handleData.TotalScore,
 				appConfigJSON,
 			)
 			_ = dooTaskClient.SendBotMessage(employee.Manager.DooTaskUserID, message)

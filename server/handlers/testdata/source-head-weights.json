@@ -1,0 +1,478 @@
+{
+  "source_sha256": "c3f8749e6ebc046cff88a3b5d052ee7a81fad4766c2678907e6d0be01b6997c0",
+  "cases": [
+    {
+      "sheet": "02-结构部门",
+      "position": "部门负责人",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "items": [
+            {
+              "name": "结构设计里程碑达成率（交期）",
+              "item_weight": 70,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "图纸/BOM 交付齐套率",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "items": [
+            {
+              "name": "设计评审通过率",
+              "item_weight": 40,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "因设计原因的模具修改次数",
+              "item_weight": 40,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "items": [
+            {
+              "name": "变更闭环率（设计、物料）",
+              "item_weight": 60,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "跨部门协同评价",
+              "item_weight": 40,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "items": [
+            {
+              "name": "零件标准化与复用率",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "图纸归档及时性",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "CTO"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "items": [
+            {
+              "name": "结构方案对产品需求规格的满足度",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ]
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "name": "结构设计里程碑达成率（交期）",
+          "score": 13,
+          "contribution": 1.37
+        },
+        {
+          "name": "图纸/BOM 交付齐套率",
+          "score": 24,
+          "contribution": 1.8
+        },
+        {
+          "name": "设计评审通过率",
+          "score": 35,
+          "contribution": 2.1
+        },
+        {
+          "name": "因设计原因的模具修改次数",
+          "score": 46,
+          "contribution": 2.76
+        },
+        {
+          "name": "变更闭环率（设计、物料）",
+          "score": 57,
+          "contribution": 3.42
+        },
+        {
+          "name": "跨部门协同评价",
+          "score": 68,
+          "contribution": 2.72
+        },
+        {
+          "name": "零件标准化与复用率",
+          "score": 79,
+          "contribution": 3.95
+        },
+        {
+          "name": "图纸归档及时性",
+          "score": 90,
+          "contribution": 4.5
+        },
+        {
+          "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "score": 0,
+          "contribution": 0
+        },
+        {
+          "name": "结构方案对产品需求规格的满足度",
+          "score": 11,
+          "contribution": 2.2
+        }
+      ],
+      "expected_total": 24.82
+    },
+    {
+      "sheet": "03-电子部门",
+      "position": "部门负责人",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "items": [
+            {
+              "name": "投板计划达成率",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "items": [
+            {
+              "name": "投板成功率",
+              "item_weight": 70,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "EMC/安规测试一次通过率",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "items": [
+            {
+              "name": "与结构/嵌入式联调配合评价（协同）",
+              "item_weight": 70,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "items": [
+            {
+              "name": "物料降本与量产/国外市场/国产化达成",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "设计文档与归档",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "CTO"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "items": [
+            {
+              "name": "硬件方案对产品规格书指标的满足度",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ]
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "name": "投板计划达成率",
+          "score": 26,
+          "contribution": 3.9
+        },
+        {
+          "name": "投板成功率",
+          "score": 37,
+          "contribution": 3.89
+        },
+        {
+          "name": "EMC/安规测试一次通过率",
+          "score": 48,
+          "contribution": 3.6
+        },
+        {
+          "name": "与结构/嵌入式联调配合评价（协同）",
+          "score": 59,
+          "contribution": 4.13
+        },
+        {
+          "name": "物料降本与量产/国外市场/国产化达成",
+          "score": 70,
+          "contribution": 3.5
+        },
+        {
+          "name": "设计文档与归档",
+          "score": 81,
+          "contribution": 4.05
+        },
+        {
+          "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "score": 92,
+          "contribution": 27.6
+        },
+        {
+          "name": "硬件方案对产品规格书指标的满足度",
+          "score": 2,
+          "contribution": 0.4
+        }
+      ],
+      "expected_total": 51.07
+    },
+    {
+      "sheet": "04-软件应用开发",
+      "position": "部门负责人",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "items": [
+            {
+              "name": "版本发布计划达成率",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "items": [
+            {
+              "name": "代码阻塞/重要缺陷密度",
+              "item_weight": 73,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "items": [
+            {
+              "name": "需求变更响应及时率",
+              "item_weight": 70,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "接口协同评价（下游，和同级部门验收）",
+              "item_weight": 70,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "items": [
+            {
+              "name": "代码复用率",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            },
+            {
+              "name": "Code Review 与归档合规",
+              "item_weight": 50,
+              "required": true,
+              "scorer_types": [
+                "PM"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "CTO"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "items": [
+            {
+              "name": "软件功能对产品需求的实现符合度",
+              "item_weight": 100,
+              "required": true,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ]
+            }
+          ]
+        }
+      ],
+      "items": [
+        {
+          "name": "版本发布计划达成率",
+          "score": 39,
+          "contribution": 5.85
+        },
+        {
+          "name": "代码阻塞/重要缺陷密度",
+          "score": 50,
+          "contribution": 5.5
+        },
+        {
+          "name": "需求变更响应及时率",
+          "score": 61,
+          "contribution": 4.27
+        },
+        {
+          "name": "接口协同评价（下游，和同级部门验收）",
+          "score": 72,
+          "contribution": 5.04
+        },
+        {
+          "name": "代码复用率",
+          "score": 83,
+          "contribution": 4.15
+        },
+        {
+          "name": "Code Review 与归档合规",
+          "score": 94,
+          "contribution": 4.7
+        },
+        {
+          "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "score": 4,
+          "contribution": 1.2
+        },
+        {
+          "name": "软件功能对产品需求的实现符合度",
+          "score": 15,
+          "contribution": 3
+        }
+      ],
+      "expected_total": 33.71
+    }
+  ]
+}

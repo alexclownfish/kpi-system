@@ -6,11 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"html/template"
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -114,7 +112,7 @@ func loadFilteredEvaluations(c *gin.Context, statuses []string) ([]models.KPIEva
 	return evaluations, f, err
 }
 
-func publishExport(c *gin.Context, filePath, fileName, message string) error {
+func publishExport(c *gin.Context, filePath, fileName, message string, results ...ExportResultVersion) error {
 	info, err := os.Stat(filePath)
 	if err != nil {
 		return err
@@ -122,7 +120,7 @@ func publishExport(c *gin.Context, filePath, fileName, message string) error {
 	randomKey := "export_" + uuid.NewString()
 	global.Cache.Set(randomKey, fileName, 5*time.Minute)
 	url := utils.GetFileURL(c.GetString("base_url"), fmt.Sprintf("/api/download/exports/%s", randomKey))
-	c.JSON(http.StatusOK, ExportResponse{FileURL: url, FileName: fileName, FileSize: info.Size(), Message: message})
+	c.JSON(http.StatusOK, ExportResponse{FileURL: url, FileName: fileName, FileSize: info.Size(), Message: message, RequestID: requestID(c), Results: results})
 	go func() {
 		time.Sleep(30 * time.Minute)
 		_ = os.Remove(filePath)
@@ -133,11 +131,11 @@ func publishExport(c *gin.Context, filePath, fileName, message string) error {
 func ExportFinalScoreImportTemplate(c *gin.Context) {
 	evaluations, _, err := loadFilteredEvaluations(c, []string{"pending_confirm"})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondExportError(c, http.StatusBadRequest, "INVALID_EXPORT_FILTER", err.Error(), false, "请调整筛选条件后重试", nil)
 		return
 	}
 	if len(evaluations) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "没有可导入最终评分的待确认考核"})
+		respondExportError(c, http.StatusNotFound, "NO_PENDING_FINAL_SCORES", "没有可导入最终评分的待确认考核", false, "请调整部门、周期或状态筛选条件", nil)
 		return
 	}
 	f := excelize.NewFile()
@@ -172,17 +170,17 @@ func ExportFinalScoreImportTemplate(c *gin.Context) {
 		f.SetColWidth(sheet, col, col, width)
 	}
 	if err := os.MkdirAll(ExportDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建导出目录失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_DIRECTORY_FAILED", "创建导出目录失败", true, "请稍后重试；若仍失败，请检查服务存储空间并提供 request_id", nil)
 		return
 	}
 	fileName := fmt.Sprintf("最终评分导入模板-%s.xlsx", time.Now().Format("20060102-150405"))
 	filePath := filepath.Join(ExportDir, fileName)
 	if err := f.SaveAs(filePath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成导入模板失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_RENDER_FAILED", "生成导入模板失败", true, "请稍后重试；若连续失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	if err := publishExport(c, filePath, fileName, "导入模板生成成功"); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成下载链接失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_PUBLISH_FAILED", "生成下载链接失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 	}
 }
 
@@ -482,53 +480,6 @@ func safeFileName(value string) string {
 	return value
 }
 
-const signoffHTML = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
-@page{size:A4;margin:14mm}body{font-family:"Noto Sans CJK SC","Microsoft YaHei",sans-serif;color:#111;font-size:12px}h1{text-align:center;font-size:22px;margin:0 0 18px}.meta{width:100%;border-collapse:collapse;margin-bottom:14px}.meta td,.scores th,.scores td{border:1px solid #333;padding:7px}.scores{width:100%;border-collapse:collapse}.scores th{background:#eee}.summary{border:1px solid #333;min-height:70px;padding:8px;margin-top:12px}.signatures{margin-top:34px;display:grid;grid-template-columns:1fr 1fr;gap:28px 48px}.foot{margin-top:30px;font-size:10px;word-break:break-all;color:#555}</style></head><body>
-<h1>绩效考核结果确认表</h1><table class="meta"><tr><td>员工：{{.Payload.EmployeeName}}</td><td>部门：{{.Payload.Department}}</td></tr><tr><td>岗位：{{.Payload.Position}}</td><td>周期：{{.Period}}</td></tr><tr><td>模板：{{.Payload.TemplateName}}</td><td>总分：{{printf "%.2f" .Payload.TotalScore}}</td></tr></table>
-<table class="scores"><thead><tr><th>指标</th><th>满分</th><th>最终得分</th><th>最终评价</th></tr></thead><tbody>{{range .Payload.Items}}<tr><td>{{.Name}}</td><td>{{printf "%.2f" .MaxScore}}</td><td>{{printf "%.2f" .FinalScore}}</td><td>{{.FinalComment}}</td></tr>{{end}}</tbody></table>
-<div class="summary"><strong>总结评价：</strong><br>{{.Payload.FinalComment}}</div><div class="signatures"><div>员工签字：________________</div><div>直属主管签字：________________</div><div>HR签字：________________</div><div>签字日期：______年____月____日</div></div>
-<div class="foot">考核编号：KPI-{{printf "%06d" .Payload.EvaluationID}}　结果版本：V{{.Version}}<br>校验码：{{.Checksum}}</div></body></html>`
-
-func chromiumBinary() (string, error) {
-	for _, name := range []string{"chromium", "chromium-browser", "google-chrome"} {
-		if path, err := exec.LookPath(name); err == nil {
-			return path, nil
-		}
-	}
-	return "", errors.New("未找到 Chromium，请重新构建后端镜像")
-}
-
-func renderSignoffPDF(evaluation models.KPIEvaluation, snapshot models.EvaluationResultSnapshot, payload resultSnapshotPayload, dir string) (string, error) {
-	tmpl, err := template.New("signoff").Parse(signoffHTML)
-	if err != nil {
-		return "", err
-	}
-	base := fmt.Sprintf("%06d-%s-%s", evaluation.ID, safeFileName(payload.EmployeeName), safeFileName(formatPeriodDisplay(payload.Period, payload.Year, payload.Month, payload.Quarter)))
-	htmlPath := filepath.Join(dir, base+".html")
-	pdfPath := filepath.Join(dir, base+".pdf")
-	file, err := os.Create(htmlPath)
-	if err != nil {
-		return "", err
-	}
-	err = tmpl.Execute(file, map[string]any{"Payload": payload, "Period": formatPeriodDisplay(payload.Period, payload.Year, payload.Month, payload.Quarter), "Version": snapshot.Version, "Checksum": snapshot.Checksum})
-	closeErr := file.Close()
-	if err != nil {
-		return "", err
-	}
-	if closeErr != nil {
-		return "", closeErr
-	}
-	binary, err := chromiumBinary()
-	if err != nil {
-		return "", err
-	}
-	output, err := exec.Command(binary, "--headless", "--no-sandbox", "--disable-gpu", "--print-to-pdf="+pdfPath, "file://"+htmlPath).CombinedOutput()
-	if err != nil {
-		return "", fmt.Errorf("PDF生成失败: %s", strings.TrimSpace(string(output)))
-	}
-	return pdfPath, nil
-}
-
 func createSignoffSummary(evaluations []models.KPIEvaluation, path string) error {
 	f := excelize.NewFile()
 	defer f.Close()
@@ -561,51 +512,53 @@ func createSignoffSummary(evaluations []models.KPIEvaluation, path string) error
 }
 
 func ExportSignoffBatch(c *gin.Context) {
-	evaluations, _, err := loadFilteredEvaluations(c, []string{"pending_confirm", "completed"})
+	evaluations, _, err := loadFilteredEvaluations(c, []string{"pending_confirm", "awaiting_employee_confirmation", "completed"})
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondExportError(c, http.StatusBadRequest, "INVALID_EXPORT_FILTER", err.Error(), false, "请调整筛选条件后重试", nil)
 		return
 	}
 	if len(evaluations) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "没有符合条件的已定稿考核"})
+		respondExportError(c, http.StatusNotFound, "NO_FINALIZED_EVALUATIONS", "没有符合条件的已定稿考核", false, "请调整部门、周期或状态筛选条件", nil)
 		return
 	}
 	tempDir, err := os.MkdirTemp("", "kpi-signoff-batch-")
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建临时目录失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_TEMP_DIRECTORY_FAILED", "创建临时目录失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	defer os.RemoveAll(tempDir)
 	pdfPaths := make([]string, 0, len(evaluations))
+	results := make([]ExportResultVersion, 0, len(evaluations))
 	for _, evaluation := range evaluations {
 		snapshot, payload, snapshotErr := GetOrCreateResultSnapshot(models.DB, evaluation.ID, c.GetUint("user_id"))
 		if snapshotErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("生成 %s 的结果版本失败", evaluation.Employee.Name)})
+			respondExportError(c, http.StatusInternalServerError, "EXPORT_RESULT_SNAPSHOT_FAILED", fmt.Sprintf("生成 %s 的结果版本失败", evaluation.Employee.Name), true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 			return
 		}
+		results = append(results, ExportResultVersion{EvaluationID: evaluation.ID, ResultVersion: snapshot.Version, Checksum: snapshot.Checksum})
 		base := fmt.Sprintf("%06d-%s-%s", evaluation.ID, safeFileName(payload.EmployeeName), safeFileName(formatPeriodDisplay(payload.Period, payload.Year, payload.Month, payload.Quarter)))
 		pdfPath := filepath.Join(tempDir, base+".pdf")
 		pdfErr := renderResultPDFFile(buildExportDocument(snapshot, payload), pdfPath)
 		if pdfErr != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": pdfErr.Error()})
+			respondExportError(c, http.StatusInternalServerError, "EXPORT_RENDER_FAILED", fmt.Sprintf("生成 %s 的签字表失败", evaluation.Employee.Name), true, "请稍后重试；若连续失败，请提供 request_id 和结果版本给管理员", &snapshot.Version)
 			return
 		}
 		pdfPaths = append(pdfPaths, pdfPath)
 	}
 	summaryPath := filepath.Join(tempDir, "签字回收汇总.xlsx")
 	if err := createSignoffSummary(evaluations, summaryPath); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成汇总表失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_SUMMARY_FAILED", "生成汇总表失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	if err := os.MkdirAll(ExportDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建导出目录失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_DIRECTORY_FAILED", "创建导出目录失败", true, "请稍后重试；若仍失败，请检查服务存储空间并提供 request_id", nil)
 		return
 	}
 	fileName := fmt.Sprintf("绩效签字表批量导出-%s.zip", time.Now().Format("20060102-150405"))
 	zipPath := filepath.Join(ExportDir, fileName)
 	archive, err := os.Create(zipPath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建ZIP失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_ARCHIVE_FAILED", "创建ZIP失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	writer := zip.NewWriter(archive)
@@ -616,7 +569,7 @@ func ExportSignoffBatch(c *gin.Context) {
 			writer.Close()
 			archive.Close()
 			os.Remove(zipPath)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "打包ZIP失败"})
+			respondExportError(c, http.StatusInternalServerError, "EXPORT_ARCHIVE_FAILED", "打包ZIP失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 			return
 		}
 		source, openErr := os.Open(path)
@@ -624,7 +577,7 @@ func ExportSignoffBatch(c *gin.Context) {
 			writer.Close()
 			archive.Close()
 			os.Remove(zipPath)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取导出文件失败"})
+			respondExportError(c, http.StatusInternalServerError, "EXPORT_FILE_READ_FAILED", "读取导出文件失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 			return
 		}
 		_, copyErr := io.Copy(entry, source)
@@ -633,24 +586,24 @@ func ExportSignoffBatch(c *gin.Context) {
 			writer.Close()
 			archive.Close()
 			os.Remove(zipPath)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "写入ZIP失败"})
+			respondExportError(c, http.StatusInternalServerError, "EXPORT_ARCHIVE_FAILED", "写入ZIP失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 			return
 		}
 	}
 	if err := writer.Close(); err != nil {
 		archive.Close()
 		os.Remove(zipPath)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "完成ZIP失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_ARCHIVE_FAILED", "完成ZIP失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	if err := archive.Close(); err != nil {
 		os.Remove(zipPath)
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存ZIP失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_ARCHIVE_FAILED", "保存ZIP失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	RecordAudit(c, "export_signoff_batch", "evaluation", fmt.Sprintf("count:%d", len(evaluations)), "SUCCESS")
-	if err := publishExport(c, zipPath, fileName, fmt.Sprintf("已生成 %d 份签字表", len(evaluations))); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成下载链接失败"})
+	if err := publishExport(c, zipPath, fileName, fmt.Sprintf("已生成 %d 份签字表", len(evaluations)), results...); err != nil {
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_PUBLISH_FAILED", "生成下载链接失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 	}
 }
 
@@ -667,7 +620,7 @@ type signoffStatisticsItem struct {
 }
 
 func GetSignoffStatistics(c *gin.Context) {
-	evaluations, _, err := loadFilteredEvaluations(c, []string{"pending_confirm", "completed"})
+	evaluations, _, err := loadFilteredEvaluations(c, []string{"pending_confirm", "awaiting_employee_confirmation", "completed"})
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -675,7 +628,7 @@ func GetSignoffStatistics(c *gin.Context) {
 	items := make([]signoffStatisticsItem, 0, len(evaluations))
 	online, paper := 0, 0
 	for _, evaluation := range evaluations {
-		item := signoffStatisticsItem{EvaluationID: evaluation.ID, Employee: evaluation.Employee.Name, Department: evaluation.Employee.Department.Name, Period: formatPeriodDisplay(evaluation.Period, evaluation.Year, evaluation.Month, evaluation.Quarter), TotalScore: evaluation.TotalScore, Status: evaluation.Status, Method: "pending"}
+		item := signoffStatisticsItem{EvaluationID: evaluation.ID, Employee: evaluation.Employee.Name, Department: evaluation.Employee.Department.Name, Period: formatPeriodDisplay(evaluation.Period, evaluation.Year, evaluation.Month, evaluation.Quarter), TotalScore: authoritativeEvaluationTotal(models.DB, evaluation), Status: evaluation.Status, Method: "pending"}
 		var confirmation models.EvaluationConfirmation
 		if err := models.DB.Preload("Handler").Where("evaluation_id = ?", evaluation.ID).First(&confirmation).Error; err == nil {
 			item.Method, item.ConfirmedAt = confirmation.Method, &confirmation.ConfirmedAt

@@ -1,0 +1,3890 @@
+{
+  "source_sha256": "c3f8749e6ebc046cff88a3b5d052ee7a81fad4766c2678907e6d0be01b6997c0",
+  "scenarios": [
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "expected_total": 73.5,
+      "expected_grade": "B",
+      "source_issues": [],
+      "evaluation_id": 1,
+      "template_id": 1,
+      "owner_email": "source-head-0@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "expected_total": 31.75,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 2,
+      "template_id": 3,
+      "owner_email": "source-engineer-0@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "02-结构部门/部门负责人",
+      "expected_total": 24.82,
+      "expected_grade": "D",
+      "source_issues": [
+        {
+          "dimension": "交付及时性",
+          "weight_sum": 120.0,
+          "cells": [
+            "E8",
+            "E9"
+          ]
+        },
+        {
+          "dimension": "交付质量",
+          "weight_sum": 80.0,
+          "cells": [
+            "E10",
+            "E11"
+          ]
+        }
+      ],
+      "status": "blocked_source_weights"
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "expected_total": 51.79,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 3,
+      "template_id": 6,
+      "owner_email": "source-engineer-1@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "03-电子部门/部门负责人",
+      "expected_total": 51.07,
+      "expected_grade": "D",
+      "source_issues": [
+        {
+          "dimension": "交付质量",
+          "weight_sum": 120.0,
+          "cells": [
+            "E9",
+            "E10"
+          ]
+        },
+        {
+          "dimension": "协同与变更",
+          "weight_sum": 70.0,
+          "cells": [
+            "E11"
+          ]
+        }
+      ],
+      "status": "blocked_source_weights"
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "expected_total": 47.07,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 4,
+      "template_id": 9,
+      "owner_email": "source-engineer-2@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "04-软件应用开发/部门负责人",
+      "expected_total": 33.71,
+      "expected_grade": "D",
+      "source_issues": [
+        {
+          "dimension": "交付质量",
+          "weight_sum": 73.0,
+          "cells": [
+            "E9"
+          ]
+        },
+        {
+          "dimension": "协同与变更",
+          "weight_sum": 140.0,
+          "cells": [
+            "E10",
+            "E11"
+          ]
+        }
+      ],
+      "status": "blocked_source_weights"
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "expected_total": 52.98,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 5,
+      "template_id": 12,
+      "owner_email": "source-engineer-3@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "expected_total": 42.38,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 6,
+      "template_id": 14,
+      "owner_email": "source-head-4@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "expected_total": 52.59,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 7,
+      "template_id": 16,
+      "owner_email": "source-engineer-4@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "expected_total": 44.28,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 8,
+      "template_id": 18,
+      "owner_email": "source-head-5@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "expected_total": 35.29,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 9,
+      "template_id": 20,
+      "owner_email": "source-engineer-5@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "expected_total": 53.23,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 10,
+      "template_id": 22,
+      "owner_email": "source-head-6@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "expected_total": 44.25,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 11,
+      "template_id": 24,
+      "owner_email": "source-engineer-6@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "expected_total": 53.39,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 12,
+      "template_id": 26,
+      "owner_email": "source-head-7@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "expected_total": 51.19,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 13,
+      "template_id": 28,
+      "owner_email": "source-engineer-7@example.test",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "expected_total": 45.78,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 14,
+      "template_id": 30,
+      "owner_email": "source-head-8@example.test",
+      "fixture_condition": "Initial no-manager failure recorded; then synthetic department head linked to CTO via normal employee API.",
+      "status": "workflow_executed"
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "expected_total": 35.85,
+      "expected_grade": "D",
+      "source_issues": [],
+      "evaluation_id": 15,
+      "template_id": 32,
+      "owner_email": "source-engineer-8@example.test",
+      "status": "workflow_executed"
+    }
+  ],
+  "checks": [
+    {
+      "case": "组织",
+      "name": "HR正常创建员工",
+      "pass": false,
+      "detail": {
+        "status": 403,
+        "body": "无权授予权限：提交考核"
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 9
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 9
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 73.5,
+        "expected": 73.5,
+        "grade": "B"
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 73.5,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 33
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "未处理异议阻止确认",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "异议复核不能伪造总分",
+      "pass": true,
+      "detail": 73.5
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "027e7f2ceea806cc8b8dfcfc3f4e7e87c28458660daf16c02a26a8554cffa559"
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 4
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 31.75,
+        "expected": 31.75,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 31.75,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 30
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "a57acc3ef035e73c33af7d8288441b55b338d12946000b33b13a57d7bcc56a43"
+    },
+    {
+      "case": "02-结构部门/部门负责人",
+      "name": "原表内部权重异常被拒绝",
+      "pass": true,
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": "模板权重配置无效",
+          "message": "每个考核维度的指标权重合计必须为100"
+        }
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 51.79,
+        "expected": 51.79,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 51.79,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "d7581765e65b5056acea498df8b61362029191806c50ee78bc6f5c89991e10cc"
+    },
+    {
+      "case": "03-电子部门/部门负责人",
+      "name": "原表内部权重异常被拒绝",
+      "pass": true,
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": "模板权重配置无效",
+          "message": "每个考核维度的指标权重合计必须为100"
+        }
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 47.07,
+        "expected": 47.07,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 47.07,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 32
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "717a7685be73b8fb4b453b8fee649782bd4da282fa1489a1505577376bc05732"
+    },
+    {
+      "case": "04-软件应用开发/部门负责人",
+      "name": "原表内部权重异常被拒绝",
+      "pass": true,
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": "模板权重配置无效",
+          "message": "每个考核维度的指标权重合计必须为100"
+        }
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 52.98,
+        "expected": 52.98,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 52.98,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "274f16eb82a5f5721f528b4030a6ba736cc802762746df990abdf8568a5e8969"
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": false,
+      "detail": {
+        "actual": 42.37,
+        "expected": 42.38,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": false,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 42.38,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": false,
+      "detail": {
+        "rows": 32
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "1b8f5dd75069d976240c9457bdff9f1398a8a3510740ab683f390addfd054b76"
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 52.59,
+        "expected": 52.59,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 52.59,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "6608660b946cbc0161a4d2c02abcd095587de39cabae7cf3b7c065c1ce72ee26"
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 44.28,
+        "expected": 44.28,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 44.28,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "1bcb585c5ed06fbec040cc127619ba74e7958c86f55c53224722ae7d1b3ed74b"
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 35.29,
+        "expected": 35.29,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 35.29,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "62519301d1b1d4718a2220d6c3fd19c90a6a5ceb2306f95793e4fe6d8580eaf5"
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 53.23,
+        "expected": 53.23,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 53.23,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 32
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "5b389afab3ab5ff0f30d95fa27b1afd39637839311c593c3cb8808021c84ef71"
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 44.25,
+        "expected": 44.25,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 44.25,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "a209f0aba7387e60a8f5d66c7156f52ebf03b381ac6dd69fa97c2aa3be0b3fda"
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 53.39,
+        "expected": 53.39,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 53.39,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 32
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "cfbded4609f353a495c480849c918538ab7b97beabc55b998095c0da53bf0c13"
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 51.19,
+        "expected": 51.19,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 51.19,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 31
+      }
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "模拟纸质签字登记完成",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "签字附件完整下载",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "67a71dfa50d08441046b818289cb5c122504377a2d634abcf206009286d8f6d9"
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 10
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "模板已有评分职责时无需旧直属上级才能自评",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": "暂无直属上级，请联系HR"
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 10
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 45.78,
+        "expected": 45.78,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 45.78,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 34
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "a53bdda5464acabb6817aa832144b7dd172b8f3196627a30dc337bf175bc8e0b"
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "原表完整指标结构保存",
+      "pass": true,
+      "detail": 200
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "综合权重及评分标准与原表一致",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "已发布模板不可覆盖",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "按部门岗位自动匹配",
+      "pass": true,
+      "detail": "self_evaluating"
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "缺少必填自评不能推进",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "无关员工不能写本人自评",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "实际评分人逐指标与原表一致",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "PM任务页面仅返回本人负责指标",
+      "pass": true,
+      "detail": 4
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "普通员工PM能在考核列表找到任务",
+      "pass": false,
+      "detail": []
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "拒绝无效评分101",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "拒绝无效评分-1",
+      "pass": true,
+      "detail": 400
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "拒绝无效评分None",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "无关用户不能提交评分",
+      "pass": true,
+      "detail": 403
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "必填未评分不能进入确认",
+      "pass": true,
+      "detail": 422
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "原表公式逐项贡献及总分等级一致",
+      "pass": true,
+      "detail": {
+        "actual": 35.85,
+        "expected": 35.85,
+        "grade": "D"
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "签字PDF全部页面竖向及完整指标",
+      "pass": true,
+      "detail": {
+        "portrait": true,
+        "missing_items": [],
+        "pages": 1,
+        "expected_total": 35.85,
+        "normalization": "NFKC + equivalent font radicals/household glyph + whitespace"
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "Excel指标总分及签字字段一致",
+      "pass": true,
+      "detail": {
+        "rows": 30
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "员工确认完成",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "body": null
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "HR维护新版本历史结果不变",
+      "pass": true,
+      "detail": "fd935ebeeb6d7345c7eb9ace98d21cfcd9f37599cee53ed01790d3e467eb8de8"
+    },
+    {
+      "case": "批量",
+      "name": "所有原表流程PDF均收入批次",
+      "pass": true,
+      "detail": 15
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 1
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 2
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 3
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 4
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 5
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 6
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 7
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 8
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 9
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 10
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 11
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 12
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 13
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 14
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "单份与批量PDF完整文本一致",
+      "pass": true,
+      "detail": 15
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 73.5,
+        "average": 73.5
+      }
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "ID 设计里程碑达成率（部门/个人）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "设计评审通过率（部门/个人）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "造型落地性（因 ID 造型导致结构返工）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求与变更响应及时率（部门/个人）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "跨部门协同评价（结论由上下游反馈，PM 负责收集数据，最终结果由 PM 输出）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "设计复用与素材库沉淀",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "流程合规与归档及时性",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "产品定义与使用场景要求的实现符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 31.75,
+        "average": 31.75
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "方案评审通过率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "协同支持评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "素材归档与命名规范",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人设计输出与需求场景的一致性",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 51.79,
+        "average": 51.79
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "图纸/BOM 下游驳回次数",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "设计评审通过率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "变更响应及时率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "归档规范（设计、物料、组装SOP等）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人交付对需求规格的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 47.07,
+        "average": 47.07
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "投板成功率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "电源/信号完整性指标达成",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "联调支持与响应",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "BOM 成本控制",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "原理图/PCB 归档规范",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人交付对硬件规格的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 52.98,
+        "average": 52.98
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "本人模块阻塞/重要缺陷密度",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "提测打回次数",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "联调与变更响应",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "代码规范与注释文档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人功能交付对需求清单的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": false,
+      "detail": {
+        "latest": 42.37,
+        "average": 42.37
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "算法交付节点达成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "仿真与实机指标偏差率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "SOR 算法指标达成率（精度/召回/识别率）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "与运控/软件联调配合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "模型库/参数库沉淀",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "实验记录与文档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "算法性能对产品定义指标的满足度与场景适配性",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 52.59,
+        "average": 52.59
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "本人模块实机指标达成",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "数据对比报告质量（测试文件）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "联调支持与响应",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "实验可复现性",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人算法指标对需求定义的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 44.28,
+        "average": 44.28
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "运控集成节点达成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "运控指标验证成功率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "运控稳定性（测试数据）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "与算法/嵌入式联调配合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "调参记录与版本管理",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "运控性能（精度/节拍）对产品需求的满足度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 35.29,
+        "average": 35.29
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "运控指标验证成功率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "运控稳定性（测试数据）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "联调与变更响应",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "参数整定记录与文档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人运控指标对需求定义的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 53.23,
+        "average": 53.23
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "测试计划执行达成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "缺陷逃逸率（漏测到下游/客户端）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "测试报告及时性与准确性",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "缺陷回归响应时长",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "测试用例复用率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "测试设备与环境成本控制",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "测试覆盖对产品需求的验证完整度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 44.25,
+        "average": 44.25
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "本人负责范围漏测缺陷数",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "缺陷报告质量（可复现率）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "回归测试及时率（上游负责给出分数）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "用例库沉淀与维护",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人测试用例对需求条目的覆盖完整度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 53.39,
+        "average": 53.39
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "固件版本节点达成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "通信稳定性（丢包率/错误帧）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "软硬件版本一致性（确保软硬版本同步）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "功能安全验证一次通过率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "变更闭环率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "文档与归档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "嵌入式功能对产品需求的实现符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 51.19,
+        "average": 51.19
+      }
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "本人模块缺陷密度",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "版本发布一致性（嵌入式版本和硬件版本挂钩）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "联调与变更响应",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "代码规范与驱动文档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人固件交付对需求规格的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 45.78,
+        "average": 45.78
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "需求/PRD 交付节点达成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求基线冻结及时率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求评审一次通过率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "下游发现的需求遗漏/歧义次数",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求变更闭环率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求澄清与协同响应评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "产品定义目标成本达成",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求文档规范与归档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求定义与客户 SOR / 市场需求的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "个人报表使用权威总分",
+      "pass": true,
+      "detail": {
+        "latest": 35.85,
+        "average": 35.85
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "个人报表逐项分数与评分结果一致",
+      "pass": false,
+      "detail": [
+        {
+          "item_name": "本人任务按期完成率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求文档评审一次通过率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求变更与澄清响应及时率",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "需求文档规范与归档",
+          "average_score": 0,
+          "max_score": 100
+        },
+        {
+          "item_name": "个人需求文档与客户/市场需求的符合度",
+          "average_score": 0,
+          "max_score": 100
+        }
+      ]
+    },
+    {
+      "case": "01-ID工业设计/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "01-ID工业设计/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "02-结构部门/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "03-电子部门/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "04-软件应用开发/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "05-算法开发/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "05-算法开发/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "06-运动控制/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "06-运动控制/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "07-测试部门/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "07-测试部门/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "08-嵌入式开发/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "部门负责人",
+          "产品经理"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "09-产品部门/部门负责人",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "09-产品部门/工程师",
+      "name": "签字栏体现原表实际评分人",
+      "pass": false,
+      "detail": {
+        "expected": [
+          "项目经理",
+          "CTO"
+        ],
+        "actual_generic": "员工签字、直属主管签字、HR签字"
+      }
+    },
+    {
+      "case": "统计",
+      "name": "同周期看板数据",
+      "pass": true,
+      "detail": {
+        "dashboard": {
+          "total_employees": 40,
+          "total_departments": 10,
+          "total_evaluations": 15,
+          "pending_evaluations": 0,
+          "completed_evaluations": 15,
+          "average_score": 47.68733333333332,
+          "recent_evaluations": [
+            {
+              "id": 15,
+              "employee": {
+                "name": "产品部门工程师",
+                "position": "工程师",
+                "department": {
+                  "name": "产品部门"
+                }
+              },
+              "total_score": 35.85,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 14,
+              "employee": {
+                "name": "产品部门负责人",
+                "position": "部门负责人",
+                "department": {
+                  "name": "产品部门"
+                }
+              },
+              "total_score": 45.78,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 13,
+              "employee": {
+                "name": "嵌入式开发部工程师",
+                "position": "工程师",
+                "department": {
+                  "name": "嵌入式开发部"
+                }
+              },
+              "total_score": 51.19,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 12,
+              "employee": {
+                "name": "嵌入式开发部负责人",
+                "position": "部门负责人",
+                "department": {
+                  "name": "嵌入式开发部"
+                }
+              },
+              "total_score": 53.39,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 11,
+              "employee": {
+                "name": "测试部门工程师",
+                "position": "工程师",
+                "department": {
+                  "name": "测试部门"
+                }
+              },
+              "total_score": 44.25,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 10,
+              "employee": {
+                "name": "测试部门负责人",
+                "position": "部门负责人",
+                "department": {
+                  "name": "测试部门"
+                }
+              },
+              "total_score": 53.23,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 9,
+              "employee": {
+                "name": "运控部工程师",
+                "position": "工程师",
+                "department": {
+                  "name": "运控部"
+                }
+              },
+              "total_score": 35.29,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 8,
+              "employee": {
+                "name": "运控部负责人",
+                "position": "部门负责人",
+                "department": {
+                  "name": "运控部"
+                }
+              },
+              "total_score": 44.28,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 7,
+              "employee": {
+                "name": "算法开发部工程师",
+                "position": "工程师",
+                "department": {
+                  "name": "算法开发部"
+                }
+              },
+              "total_score": 52.59,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            },
+            {
+              "id": 6,
+              "employee": {
+                "name": "算法开发部负责人",
+                "position": "部门负责人",
+                "department": {
+                  "name": "算法开发部"
+                }
+              },
+              "total_score": 42.37,
+              "status": "completed",
+              "period": "monthly",
+              "year": 2026,
+              "month": 9,
+              "quarter": null
+            }
+          ]
+        },
+        "canonical_mean": 47.68733333333333
+      }
+    },
+    {
+      "case": "统计",
+      "name": "月份无重复且有序",
+      "pass": true,
+      "detail": [
+        "2025-11",
+        "2025-12",
+        "2026-01",
+        "2026-02",
+        "2026-03",
+        "2026-04",
+        "2026-05",
+        "2026-06",
+        "2026-07",
+        "2026-08",
+        "2026-09",
+        "2026-10"
+      ]
+    },
+    {
+      "case": "权限",
+      "name": "无关用户不能读取考核评论",
+      "pass": false,
+      "detail": 200
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标0分",
+      "pass": true,
+      "detail": {
+        "total": 0,
+        "grade": "D",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖0分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标59分",
+      "pass": true,
+      "detail": {
+        "total": 59,
+        "grade": "D",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖59分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标60分",
+      "pass": true,
+      "detail": {
+        "total": 60,
+        "grade": "C",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖60分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标69分",
+      "pass": true,
+      "detail": {
+        "total": 69,
+        "grade": "C",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖69分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标70分",
+      "pass": true,
+      "detail": {
+        "total": 70,
+        "grade": "B",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖70分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标79分",
+      "pass": true,
+      "detail": {
+        "total": 79,
+        "grade": "B",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖79分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标80分",
+      "pass": true,
+      "detail": {
+        "total": 80,
+        "grade": "A",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖80分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标89分",
+      "pass": true,
+      "detail": {
+        "total": 89,
+        "grade": "A",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖89分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标90分",
+      "pass": true,
+      "detail": {
+        "total": 90,
+        "grade": "S",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖90分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "等级边界",
+      "name": "全部指标100分",
+      "pass": true,
+      "detail": {
+        "total": 100,
+        "grade": "S",
+        "self_score": 100
+      }
+    },
+    {
+      "case": "等级边界",
+      "name": "提交后不可覆盖100分",
+      "pass": true,
+      "detail": 409
+    },
+    {
+      "case": "HR汇总",
+      "name": "原表投入占比阈值和项目加权贡献",
+      "pass": false,
+      "detail": {
+        "source_examples": {
+          "monthly!J5": 40,
+          "monthly!J6": 28
+        },
+        "boundary_oracles": [
+          {
+            "effort": "0.1999",
+            "expected_contribution": 0.0
+          },
+          {
+            "effort": "0.2",
+            "expected_contribution": 16.0
+          },
+          {
+            "effort": "0.5",
+            "expected_contribution": 40.0
+          }
+        ],
+        "reason": "No project_name/effort_ratio/weighted_contribution fields or HR period aggregation endpoint in current model/routes; 006 T037-T042 incomplete."
+      }
+    },
+    {
+      "case": "HR汇总",
+      "name": "原表年度折算分数与等级",
+      "pass": false,
+      "detail": {
+        "monthly_source_sample_expected": 70.8,
+        "grade": "B",
+        "quarterly_synthetic_expected": 75.3,
+        "quarter_weights": [
+          1,
+          1.3,
+          1.5,
+          1.3
+        ],
+        "reason": "Configurable period weights and missing-period weighted-average feature unimplemented; quarterly source formulas in K/L instead of H/I require explicit correction."
+      }
+    },
+    {
+      "case": "浏览器ID工程师",
+      "name": "新流程提供可填写自评表单",
+      "pass": false,
+      "detail": "2026-10-01 mouse-click verification, assessment26 self_evaluating; six scorer fields disabled, legacy self section has no item input; 完成自评 reports six missing items. Screenshot ui-self-blocked.jpg."
+    },
+    {
+      "case": "浏览器ID工程师",
+      "name": "新流程状态中文显示一致",
+      "pass": false,
+      "detail": "List and detail header show 未知状态; scoring panel correctly shows 员工自评 for same assessment."
+    },
+    {
+      "case": "产品部门",
+      "name": "产品团队负责人缺失自动回退CTO",
+      "pass": false,
+      "detail": "Source G31 requires conditional product-team-head then CTO. Current supported codes PM/DEPARTMENT_MANAGER/PRODUCT_MANAGER/CTO have no conditional fallback. This suite explicitly configured CTO to test the no-product-team-head branch; it does not prove automatic fallback."
+    },
+    {
+      "case": "导出配置",
+      "name": "支持原表维度及综合权重评分人列",
+      "pass": false,
+      "detail": {
+        "status": 400,
+        "body": {
+          "error": "导出版式配置无效",
+          "message": "不支持的导出字段: dimension_weight"
+        }
+      }
+    },
+    {
+      "case": "季度考核",
+      "name": "相同原表指标季度评分73.50/B",
+      "pass": true,
+      "detail": 73.5
+    },
+    {
+      "case": "导出配置",
+      "name": "原表自定义签字栏可以生效",
+      "pass": false,
+      "detail": {
+        "version": 1,
+        "preset": "final_signoff",
+        "title": "ID工业设计部绩效评分与签字表",
+        "orientation": "portrait",
+        "columns": [
+          "item_name",
+          "max_score",
+          "final_score",
+          "final_comment"
+        ],
+        "show_summary": true,
+        "show_employee_opinion": true,
+        "signature_labels": [
+          "员工签字",
+          "项目经理签字",
+          "CTO签字",
+          "产品经理签字",
+          "签字日期"
+        ]
+      }
+    },
+    {
+      "case": "导出配置",
+      "name": "模板确已保存自定义签字栏",
+      "pass": true,
+      "detail": {
+        "version": 1,
+        "preset": "final_signoff",
+        "title": "ID工业设计部绩效评分与签字表",
+        "orientation": "portrait",
+        "columns": [
+          "item_name",
+          "max_score",
+          "final_score",
+          "final_comment"
+        ],
+        "show_summary": true,
+        "show_employee_opinion": true,
+        "signature_labels": [
+          "员工签字",
+          "项目经理签字",
+          "CTO签字",
+          "产品经理签字",
+          "签字日期"
+        ]
+      }
+    },
+    {
+      "case": "导出配置",
+      "name": "显式模板路径自定义签字栏生效",
+      "pass": true,
+      "detail": {
+        "evaluation_id": 28,
+        "labels": [
+          "员工签字",
+          "项目经理签字",
+          "CTO签字",
+          "产品经理签字",
+          "签字日期"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "passed": 313,
+    "failed": 79,
+    "total": 392,
+    "workflow_executed": 15,
+    "source_blocked": 3,
+    "grade_boundary_workflows": 10,
+    "additional_quarterly_workflows": 2
+  },
+  "pending_ui_evaluation": 26
+}

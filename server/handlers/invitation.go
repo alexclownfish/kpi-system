@@ -192,6 +192,9 @@ func GetEvaluationInvitations(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "评估不存在或评估对象已被删除"})
 		return
 	}
+	// GET requests are read-only. New workflow task materialization happens
+	// during assessment creation or an explicit migration/repair operation;
+	// opening this page must never create invitations as a side effect.
 
 	// 权限检查：HR可以查看所有邀请，被邀请人可以查看自己相关的邀请，被评估员工可以查看自己的评估的邀请
 	var invitations []models.EvaluationInvitation

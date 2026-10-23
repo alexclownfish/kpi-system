@@ -56,6 +56,9 @@ func UserHasPermission(userID uint, permission string) bool {
 	if count > 0 {
 		return true
 	}
+	if !mayUseLegacyRole(userID) {
+		return false
+	}
 	// Compatibility for records created before the RBAC migration.
 	var employee models.Employee
 	if models.DB.Select("role").First(&employee, userID).Error != nil {
@@ -77,7 +80,7 @@ func UserPermissions(userID uint) []string {
 	models.DB.Table("permissions p").Select("p.code").Distinct().
 		Joins("JOIN role_permissions rp ON rp.permission_id = p.id").
 		Joins("JOIN user_roles ur ON ur.role_id = rp.role_id").Where("ur.user_id = ?", userID).Order("p.code").Pluck("p.code", &codes)
-	if len(codes) == 0 {
+	if len(codes) == 0 && mayUseLegacyRole(userID) {
 		var employee models.Employee
 		if models.DB.Select("role").First(&employee, userID).Error == nil {
 			legacy := LegacyRoleCode(employee.Role)
@@ -86,6 +89,12 @@ func UserPermissions(userID uint) []string {
 		}
 	}
 	return codes
+}
+
+// A migrated user's binding is authoritative, even when it grants no access.
+func mayUseLegacyRole(userID uint) bool {
+	var count int64
+	return models.DB.Model(&models.UserRole{}).Where("user_id = ?", userID).Count(&count).Error == nil && count == 0
 }
 
 func LegacyRoleCode(role string) string {
@@ -135,6 +144,27 @@ func ReplaceUserRole(db *gorm.DB, userID uint, roleCode string) error {
 	if err := db.Where("code = ?", LegacyRoleCode(roleCode)).First(&role).Error; err != nil {
 		return err
 	}
+	return replaceUserRoleRecord(db, userID, role)
+}
+
+// SyncEmployeeRole is the single write path for the legacy employee role
+// column and the RBAC user_roles binding. Both representations are retained
+// for backwards compatibility, but they must never drift apart. Callers
+// should invoke this inside their surrounding transaction.
+func SyncEmployeeRole(db *gorm.DB, userID uint, roleCode string) error {
+	var role models.Role
+	if err := db.Where("code = ?", LegacyRoleCode(roleCode)).First(&role).Error; err != nil {
+		return err
+	}
+	if err := db.Model(&models.Employee{}).
+		Where("id = ?", userID).
+		Update("role", LegacyRoleValue(role.Code)).Error; err != nil {
+		return err
+	}
+	return replaceUserRoleRecord(db, userID, role)
+}
+
+func replaceUserRoleRecord(db *gorm.DB, userID uint, role models.Role) error {
 	if err := db.Where("user_id = ?", userID).Delete(&models.UserRole{}).Error; err != nil {
 		return err
 	}
@@ -146,7 +176,8 @@ var assignableScopeRank = map[string]int{
 	"ASSIGNED":            1,
 	"DIRECT_SUBORDINATES": 2,
 	"DEPARTMENT":          3,
-	"ALL":                 4,
+	"DEPARTMENT_TREE":     4,
+	"ALL":                 5,
 }
 
 func IsAssignableDataScope(scope string) bool {
@@ -259,6 +290,28 @@ func CanGrantExistingRole(db *gorm.DB, actorID uint, role models.Role) error {
 	if err := db.Model(&models.RolePermission{}).Where("role_id = ?", role.ID).Pluck("permission_id", &permissionIDs).Error; err != nil {
 		return err
 	}
+	// Onboarding may delegate the employee's own submission permission, which
+	// HR does not need personally. All other permissions and scope still pass
+	// the regular grant checks, including customized built-in roles.
+	if role.IsSystem && (role.Code == "employee" || role.Code == "department_manager") && UserHasPermission(actorID, "employee:assign_role") {
+		var submitIDs []uint
+		if err := db.Model(&models.Permission{}).Where("code = ?", "assessment:submit").Pluck("id", &submitIDs).Error; err != nil {
+			return err
+		}
+		filtered := make([]uint, 0, len(permissionIDs))
+		for _, id := range permissionIDs {
+			exempt := false
+			for _, submitID := range submitIDs {
+				if id == submitID {
+					exempt = true
+				}
+			}
+			if !exempt {
+				filtered = append(filtered, id)
+			}
+		}
+		permissionIDs = filtered
+	}
 	_, err := ValidateGrantableRole(db, actorID, permissionIDs, RoleScopeCode(db, role.ID))
 	return err
 }
@@ -297,6 +350,9 @@ func DataScopeForUser(userID uint) string {
 	if err == nil && scope != "" {
 		return scope
 	}
+	if !mayUseLegacyRole(userID) {
+		return "SELF"
+	}
 	var employee models.Employee
 	if models.DB.Select("role").First(&employee, userID).Error == nil {
 		if employee.Role == "hr" {
@@ -319,8 +375,7 @@ func ApplyEmployeeScope(query *gorm.DB, userID uint) *gorm.DB {
 	case "DIRECT_SUBORDINATES":
 		return query.Where("manager_id = ?", userID)
 	case "DEPARTMENT_TREE":
-		// Department hierarchy is not yet modeled; department scope is the safe MVP fallback.
-		return query.Where("department_id = (SELECT department_id FROM employees WHERE id = ?)", userID)
+		return query.Where("department_id IN ("+models.UserDepartmentSubtreeSQL+")", userID)
 	case "ASSIGNED":
 		return query.Where("1 = 0")
 	default:
@@ -331,17 +386,20 @@ func ApplyEmployeeScope(query *gorm.DB, userID uint) *gorm.DB {
 // ApplyEvaluationScope constrains KPI evaluations through their employee.
 // ASSIGNED uses the review invitation table instead of exposing employee data.
 func ApplyEvaluationScope(query *gorm.DB, userID uint) *gorm.DB {
+	assigned := "kpi_evaluations.id IN (SELECT evaluation_id FROM evaluation_scoring_tasks WHERE scorer_user_id = ?)"
 	switch DataScopeForUser(userID) {
 	case "ALL":
 		return query
-	case "DEPARTMENT", "DEPARTMENT_TREE":
-		return query.Where("kpi_evaluations.employee_id IN (SELECT department_members.id FROM employees department_members WHERE department_members.department_id = (SELECT department_id FROM employees WHERE id = ?))", userID)
+	case "DEPARTMENT":
+		return query.Where("(kpi_evaluations.employee_id IN (SELECT department_members.id FROM employees department_members WHERE department_members.department_id = (SELECT department_id FROM employees WHERE id = ?)) OR "+assigned+")", userID, userID)
+	case "DEPARTMENT_TREE":
+		return query.Where("(kpi_evaluations.employee_id IN (SELECT id FROM employees WHERE department_id IN ("+models.UserDepartmentSubtreeSQL+")) OR "+assigned+")", userID, userID)
 	case "DIRECT_SUBORDINATES":
-		return query.Where("kpi_evaluations.employee_id IN (SELECT direct_reports.id FROM employees direct_reports WHERE direct_reports.manager_id = ?)", userID)
+		return query.Where("(kpi_evaluations.employee_id IN (SELECT direct_reports.id FROM employees direct_reports WHERE direct_reports.manager_id = ?) OR "+assigned+")", userID, userID)
 	case "ASSIGNED":
-		return query.Where("kpi_evaluations.id IN (SELECT evaluation_id FROM evaluation_invitations WHERE invitee_id = ?)", userID)
+		return query.Where("(kpi_evaluations.employee_id = ? OR kpi_evaluations.id IN (SELECT evaluation_id FROM evaluation_invitations WHERE invitee_id = ?) OR "+assigned+")", userID, userID, userID)
 	default:
-		return query.Where("kpi_evaluations.employee_id = ?", userID)
+		return query.Where("(kpi_evaluations.employee_id = ? OR "+assigned+")", userID, userID)
 	}
 }
 

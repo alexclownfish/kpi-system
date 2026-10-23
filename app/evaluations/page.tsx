@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -34,8 +35,13 @@ import {
   Download,
   Upload,
   FileSignature,
+  Settings2,
 } from "lucide-react"
 import {
+  getApiErrorMessage as getErrorMessage,
+  getApiErrorCode,
+  getApiErrorDetails,
+  getApiErrorRequestId,
   evaluationApi,
   scoreApi,
   templateApi,
@@ -57,7 +63,9 @@ import {
   type EvaluationStats,
   type PerformanceRule,
   type EvaluationConfirmation,
+  type EvaluationSignoffSupplement,
   type FinalScoreImportPreview,
+  type EvaluationTemplateMatchPreview,
 } from "@/lib/api"
 import { useAuth } from "@/lib/auth-context"
 import { useAppContext } from "@/lib/app-context"
@@ -65,11 +73,15 @@ import { useUnreadContext } from "@/lib/unread-context"
 import { useNotification } from "@/lib/notification-context"
 import { generateInputPlaceholder, getPeriodValue, isUnknown, scoreInputValidation, formatScore } from "@/lib/utils"
 import { EmployeeCombobox, EmployeeSelector } from "@/components/employee-selector"
+import { EvaluationScoringTaskList } from "@/components/evaluation-scoring-task-list"
+import { EvaluationSelfScoreList } from "@/components/evaluation-self-score-list"
 import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { toast } from "sonner"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { downloadUrl } from "@dootask/tools"
+import { downloadExportFile, getExportDownloadRequestId } from "@/lib/export-download"
+import { canRegisterPaperSignoff } from "@/lib/evaluation-signoff"
 
 // 计算上个月和对应年份的函数
 const getLastMonth = () => {
@@ -86,6 +98,20 @@ const getLastMonth = () => {
   }
 }
 
+function describeExportFailure(error: unknown, fallback: string): string {
+  const message = getErrorMessage(error, fallback)
+  const code = getApiErrorCode(error)
+  const details = getApiErrorDetails(error)
+  const requestId = getApiErrorRequestId(error) || getExportDownloadRequestId(error)
+  const diagnostics = [
+    code ? `错误码：${code}` : "",
+    typeof details?.result_version === "number" ? `结果版本：V${details.result_version}` : "",
+    requestId ? `请求 ID：${requestId}` : "",
+  ].filter(Boolean)
+  const guidance = details?.retry_guidance || (details?.retryable ? "请稍后重试。" : "")
+  return [message, guidance, diagnostics.length ? diagnostics.join("；") : ""].filter(Boolean).join("\n")
+}
+
 export default function EvaluationsPage() {
   const { Alert, Confirm, getStatusBadge, isTouch } = useAppContext()
   const { refreshUnreadEvaluations } = useUnreadContext()
@@ -93,24 +119,39 @@ export default function EvaluationsPage() {
   const { onMessage } = useNotification()
   const detailsRef = useRef<HTMLDivElement>(null)
 
+  const isNewWorkflowEvaluation = (evaluation: KPIEvaluation) =>
+    evaluation.calculation_version === "weighted-v2" ||
+    ["draft", "self_evaluating", "scoring", "awaiting_review", "awaiting_employee_confirmation", "rejected", "cancelled"].includes(evaluation.status)
+
   // 提取API错误信息的辅助函数
-  const getErrorMessage = (error: unknown, defaultMessage: string): string => {
-    const apiError = error as { response?: { data?: { error?: string; message?: string } } }
-    return apiError.response?.data?.error || apiError.response?.data?.message || defaultMessage
-  }
   const [evaluations, setEvaluations] = useState<KPIEvaluation[]>([])
   const [templates, setTemplates] = useState<KPITemplate[]>([])
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [isCreatingEvaluation, setIsCreatingEvaluation] = useState(false)
+  const creatingEvaluationRef = useRef(false)
   const [scoreDialogOpen, setScoreDialogOpen] = useState(false)
   const [submitObjectionDialogOpen, setSubmitObjectionDialogOpen] = useState(false) // 员工提交异议对话框
   const [handleObjectionDialogOpen, setHandleObjectionDialogOpen] = useState(false) // HR处理异议对话框
   const [selectedEvaluation, setSelectedEvaluation] = useState<KPIEvaluation | null>(null)
   const [scores, setScores] = useState<KPIScore[]>([])
   const [activeTab, setActiveTab] = useState("details")
+  const showsCanonicalSummary = selectedEvaluation ? isNewWorkflowEvaluation(selectedEvaluation) : false
 
   const [isSubmittingSelfEvaluation, setIsSubmittingSelfEvaluation] = useState(false)
   const [isSubmittingObjection, setIsSubmittingObjection] = useState(false)
   const [confirmation, setConfirmation] = useState<EvaluationConfirmation | null>(null)
+  const [signoffSupplements, setSignoffSupplements] = useState<EvaluationSignoffSupplement[]>([])
+  const [workflowTaskSummary, setWorkflowTaskSummary] = useState<{
+    workflow_state: string
+    completion: { required: number; submitted: number; blocking: number }
+  } | null>(null)
+  const [workSummaryForm, setWorkSummaryForm] = useState({
+    work_summary: "",
+    work_risks: "",
+    support_needed: "",
+    next_plan: "",
+  })
+  const [savingWorkSummary, setSavingWorkSummary] = useState(false)
   const [paperDialogOpen, setPaperDialogOpen] = useState(false)
   const [paperSignedAt, setPaperSignedAt] = useState("")
   const [paperRemark, setPaperRemark] = useState("")
@@ -118,6 +159,11 @@ export default function EvaluationsPage() {
   const [isExportingResult, setIsExportingResult] = useState(false)
   const [isConfirmingResult, setIsConfirmingResult] = useState(false)
   const [isSubmittingPaper, setIsSubmittingPaper] = useState(false)
+  const [supplementDialogOpen, setSupplementDialogOpen] = useState(false)
+  const [supplementSignedAt, setSupplementSignedAt] = useState("")
+  const [supplementRemark, setSupplementRemark] = useState("")
+  const [supplementFile, setSupplementFile] = useState<File | null>(null)
+  const [isSubmittingSupplement, setIsSubmittingSupplement] = useState(false)
   const [batchDialogOpen, setBatchDialogOpen] = useState(false)
   const [batchFile, setBatchFile] = useState<File | null>(null)
   const [batchPreview, setBatchPreview] = useState<FinalScoreImportPreview | null>(null)
@@ -145,7 +191,7 @@ export default function EvaluationsPage() {
   const [statsData, setStatsData] = useState<EvaluationStats | null>(null)
 
   // 添加绩效视图Tab相关状态
-  const [viewTab, setViewTab] = useState<"my" | "team" | "all">("my") // 默认显示我的绩效
+  const [viewTab, setViewTab] = useState<"my" | "team" | "all" | "assigned">("my") // 默认显示我的绩效
 
   // 使用分页Hook
   const { currentPage, pageSize, setCurrentPage, handlePageSizeChange, resetPagination } = usePagination(10)
@@ -203,7 +249,12 @@ export default function EvaluationsPage() {
     year: lastMonthData.year,
     month: lastMonthData.month,
     quarter: Math.floor((lastMonthData.month - 1) / 3) + 1,
+    project_name: "",
+    allocation_ratio: "",
   })
+  const [templatePreview, setTemplatePreview] = useState<EvaluationTemplateMatchPreview | null>(null)
+  const [templatePreviewLoading, setTemplatePreviewLoading] = useState(false)
+  const [templatePreviewError, setTemplatePreviewError] = useState("")
 
   // 一键创建考核对话框状态
   const [quickCreateDialogOpen, setQuickCreateDialogOpen] = useState(false)
@@ -230,12 +281,21 @@ export default function EvaluationsPage() {
       }
 
       // 根据Tab和角色设置员工筛选
-      if (viewTab === "my") {
+      if (viewTab === "assigned") {
+        params.assigned_to_me = true
+      } else if (viewTab === "my") {
         // 我的绩效：只显示自己的
         params.employee_id = currentUser?.id.toString()
       } else if (viewTab === "team") {
         // 团队绩效：根据角色显示自己的团队
-        if (isHR) {
+        if (currentUser?.data_scope === "DEPARTMENT_TREE") {
+          // The backend enforces the full subtree, not just the actor's department.
+          if (/^department:/.test(employeeFilter)) {
+            params.department_id = employeeFilter.replace("department:", "")
+          } else if (employeeFilter && employeeFilter !== "all") {
+            params.employee_id = employeeFilter
+          }
+        } else if (isHR) {
           // HR：团队 = 自己所在部门 + 直属下级（可跨部门）
           if (!currentUser?.department_id) {
             // 没有设置部门：只查询直属下级
@@ -323,6 +383,15 @@ export default function EvaluationsPage() {
       setScores(response.data || [])
     } catch (error) {
       console.error("获取评估详情失败:", error)
+    }
+  }
+
+  const fetchWorkflowTaskSummary = async (evaluationId: number) => {
+    try {
+      const response = await evaluationApi.getScoringTasks(evaluationId)
+      setWorkflowTaskSummary({ workflow_state: response.data.workflow_state, completion: response.data.completion })
+    } catch {
+      setWorkflowTaskSummary(null)
     }
   }
 
@@ -570,6 +639,37 @@ export default function EvaluationsPage() {
   }, [])
 
   useEffect(() => {
+    const employeeId = formData.employee_ids.length === 1 ? Number(formData.employee_ids[0]) : 0
+    if (!employeeId) {
+      setTemplatePreview(null)
+      setTemplatePreviewLoading(false)
+      setFormData(current => ({ ...current, template_id: "" }))
+      setTemplatePreviewError(formData.employee_ids.length > 1 ? "批量选择多个员工时，请确认他们的岗位适用同一模板。" : "")
+      return
+    }
+    let cancelled = false
+    setTemplatePreview(null)
+    setFormData(current => ({ ...current, template_id: "" }))
+    setTemplatePreviewLoading(true)
+    setTemplatePreviewError("")
+    templateApi.previewMatch(employeeId, formData.period)
+      .then(response => {
+        if (cancelled) return
+        setTemplatePreview(response.data)
+        setTemplatePreviewError(response.data.blocking_errors?.join("；") || "")
+        setFormData(current => ({ ...current, template_id: String(response.data.template.id) }))
+      })
+      .catch(error => {
+        if (!cancelled) {
+          setTemplatePreview(null)
+          setTemplatePreviewError(getErrorMessage(error, "暂未匹配到已发布模板"))
+        }
+      })
+      .finally(() => { if (!cancelled) setTemplatePreviewLoading(false) })
+    return () => { cancelled = true }
+  }, [formData.employee_ids, formData.period])
+
+  useEffect(() => {
     fetchPerformanceRule()
   }, [fetchPerformanceRule])
 
@@ -593,7 +693,7 @@ export default function EvaluationsPage() {
   }, [isHR, selectedEvaluation, fetchPerformanceRule])
 
   // 切换Tab时重置筛选和分页
-  const handleTabChange = (tab: "my" | "team" | "all") => {
+  const handleTabChange = (tab: "my" | "team" | "all" | "assigned") => {
     setViewTab(tab)
     setStatusFilter("all")
     setEmployeeFilter("all")
@@ -771,6 +871,7 @@ export default function EvaluationsPage() {
   // 创建新评估
   const handleCreateEvaluation = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (creatingEvaluationRef.current) return
 
     // 验证是否至少选择了一个员工
     if (formData.employee_ids.length === 0) {
@@ -783,7 +884,15 @@ export default function EvaluationsPage() {
       Alert("验证失败", "请选择考核模板")
       return
     }
+    const projectName = formData.project_name.trim()
+    const allocationRatio = formData.allocation_ratio.trim() === "" ? undefined : Number(formData.allocation_ratio) / 100
+    if (allocationRatio !== undefined && (!Number.isFinite(allocationRatio) || allocationRatio < 0 || allocationRatio > 1)) {
+      Alert("验证失败", "项目投入占比必须在 0–100% 之间")
+      return
+    }
 
+    creatingEvaluationRef.current = true
+    setIsCreatingEvaluation(true)
     try {
       // 获取当前选中的模板信息
       const selectedTemplate = templates.find(t => t.id.toString() === formData.template_id)
@@ -844,7 +953,7 @@ export default function EvaluationsPage() {
         if (employeeEvaluations.length > 0) {
           // 检查是否有完全相同的模板
           const sameTemplateEval = employeeEvaluations.find(
-            evaluation => evaluation.template_id.toString() === formData.template_id
+            evaluation => evaluation.template_id.toString() === formData.template_id && (evaluation.project_name || "").trim() === projectName
           )
 
           if (sameTemplateEval) {
@@ -912,7 +1021,7 @@ export default function EvaluationsPage() {
                 ? evaluation.quarter === formData.quarter
                 : true)
         )
-        return !employeeEvaluations.some(evaluation => evaluation.template_id.toString() === formData.template_id)
+        return !employeeEvaluations.some(evaluation => evaluation.template_id.toString() === formData.template_id && (evaluation.project_name || "").trim() === projectName)
       })
 
       if (employeesToCreate.length === 0) {
@@ -934,6 +1043,8 @@ export default function EvaluationsPage() {
           year: formData.year,
           month: formData.period === "monthly" ? formData.month : undefined,
           quarter: formData.period === "quarterly" ? formData.quarter : undefined,
+          project_name: projectName || undefined,
+          allocation_ratio: allocationRatio,
           status: "pending",
           total_score: 0,
           final_comment: "",
@@ -955,6 +1066,8 @@ export default function EvaluationsPage() {
         year: lastMonthReset.year,
         month: lastMonthReset.month,
         quarter: Math.floor((lastMonthReset.month - 1) / 3) + 1,
+        project_name: "",
+        allocation_ratio: "",
       })
 
       // 成功提示
@@ -968,6 +1081,9 @@ export default function EvaluationsPage() {
       console.error("创建评估失败:", error)
       const errorMessage = getErrorMessage(error, "创建考核失败，请重试")
       Alert("创建失败", errorMessage)
+    } finally {
+      creatingEvaluationRef.current = false
+      setIsCreatingEvaluation(false)
     }
   }
 
@@ -1124,6 +1240,24 @@ export default function EvaluationsPage() {
         Alert("验证失败", validationError)
         return
       }
+    }
+
+    if (stage === "self" && selectedEvaluation && isNewWorkflowEvaluation(selectedEvaluation)) {
+      const missing = scores.filter(score => score.item?.required && isUnknown(score.self_score))
+      if (missing.length) { await Alert("自评未完成", `还有 ${missing.length} 个必填指标未评分`); return }
+      if (!(await Confirm("完成自评", "确定提交自评并进入模板评分阶段吗？"))) return
+      try {
+        setIsSubmittingSelfEvaluation(true)
+        await evaluationApi.advanceWorkflow(evaluationId, selectedEvaluation.status)
+        const response = await evaluationApi.getById(evaluationId)
+        setSelectedEvaluation(response.data)
+        await fetchWorkflowTaskSummary(evaluationId)
+        await fetchEvaluationScores(evaluationId)
+        await fetchEvaluations()
+        toast.success("自评已提交")
+      } catch (error) { await Alert("提交失败", getErrorMessage(error, "自评提交失败")) }
+      finally { setIsSubmittingSelfEvaluation(false) }
+      return
     }
 
     // 自评阶段的特殊处理
@@ -1598,19 +1732,28 @@ export default function EvaluationsPage() {
     }
   }
 
+  const fetchSignoffSupplements = async (evaluationId: number) => {
+    try {
+      const response = await evaluationApi.listConfirmationSupplements(evaluationId)
+      setSignoffSupplements(response.data || [])
+    } catch (error) {
+      console.error("获取补充签字材料失败:", error)
+      setSignoffSupplements([])
+    }
+  }
+
   const handleExportResult = async (format: "xlsx" | "pdf" = "xlsx") => {
     if (!selectedEvaluation) return
     try {
       setIsExportingResult(true)
       const response = await exportApi.evaluation(selectedEvaluation.id, format)
-      try {
-        await downloadUrl(response.file_url)
-      } catch {
-        window.open(response.file_url, "_blank")
-      }
+      await downloadExportFile(response, {
+        downloadUrl,
+        openWindow: (url, target) => window.open(url, target),
+      })
       toast.success(`${format === "pdf" ? "PDF" : "Excel"}最终评分表导出成功${response.result_version ? `（V${response.result_version}）` : ""}`)
     } catch (error) {
-      await Alert("导出失败", getErrorMessage(error, "最终评分表导出失败，请重试"))
+      await Alert("导出失败", describeExportFailure(error, "最终评分表导出失败，请重试"))
     } finally {
       setIsExportingResult(false)
     }
@@ -1647,6 +1790,35 @@ export default function EvaluationsPage() {
     }
   }
 
+  const handleSupplementUpload = async () => {
+    if (!selectedEvaluation || selectedEvaluation.status !== "completed" || !supplementFile) {
+      await Alert("表单验证", "请选择要补充的签字材料。")
+      return
+    }
+    if (supplementFile.size > 10 * 1024 * 1024) {
+      await Alert("文件过大", "签字材料不能超过10MB。")
+      return
+    }
+    try {
+      setIsSubmittingSupplement(true)
+      await evaluationApi.uploadConfirmationSupplement(selectedEvaluation.id, {
+        signedAt: supplementSignedAt || undefined,
+        remark: supplementRemark,
+        file: supplementFile,
+      })
+      setSupplementDialogOpen(false)
+      setSupplementFile(null)
+      setSupplementRemark("")
+      setSupplementSignedAt("")
+      await fetchSignoffSupplements(selectedEvaluation.id)
+      await Alert("补充成功", "纸质签字材料已补充归档，考核完成状态不变。")
+    } catch (error) {
+      await Alert("补充失败", getErrorMessage(error, "纸质签字材料补充失败，请重试"))
+    } finally {
+      setIsSubmittingSupplement(false)
+    }
+  }
+
   const handleDownloadSignoff = async () => {
     if (!selectedEvaluation || !confirmation?.attachment_name) return
     try {
@@ -1662,6 +1834,21 @@ export default function EvaluationsPage() {
     }
   }
 
+  const handleDownloadSupplement = async (supplement: EvaluationSignoffSupplement) => {
+    if (!selectedEvaluation || !supplement.attachment_name) return
+    try {
+      const blob = await evaluationApi.downloadConfirmationSupplement(selectedEvaluation.id, supplement.id)
+      const url = URL.createObjectURL(blob)
+      const anchor = document.createElement("a")
+      anchor.href = url
+      anchor.download = supplement.attachment_name
+      anchor.click()
+      URL.revokeObjectURL(url)
+    } catch (error) {
+      await Alert("下载失败", getErrorMessage(error, "补充签字材料下载失败"))
+    }
+  }
+
   const getBatchParams = () => ({
     year: batchFilter.year.toString(),
     period: batchFilter.period,
@@ -1669,12 +1856,11 @@ export default function EvaluationsPage() {
     quarter: batchFilter.period === "quarterly" ? batchFilter.quarter.toString() : undefined,
   })
 
-  const downloadExport = async (response: { file_url: string }) => {
-    try {
-      await downloadUrl(response.file_url)
-    } catch {
-      window.open(response.file_url, "_blank")
-    }
+  const downloadExport = async (response: { file_url: string; request_id?: string }) => {
+    await downloadExportFile(response, {
+      downloadUrl,
+      openWindow: (url, target) => window.open(url, target),
+    })
   }
 
   const handleDownloadImportTemplate = async () => {
@@ -1683,7 +1869,7 @@ export default function EvaluationsPage() {
       await downloadExport(await finalScoreImportApi.template(getBatchParams()))
       toast.success("最终评分导入模板已生成")
     } catch (error) {
-      await Alert("模板下载失败", getErrorMessage(error, "没有可导入的待确认考核，或模板生成失败"))
+      await Alert("模板下载失败", describeExportFailure(error, "没有可导入的待确认考核，或模板生成失败"))
     } finally {
       setBatchBusy(false)
     }
@@ -1728,9 +1914,28 @@ export default function EvaluationsPage() {
       await downloadExport(response)
       toast.success(response.message)
     } catch (error) {
-      await Alert("批量导出失败", getErrorMessage(error, "签字表 ZIP 生成失败"))
+      await Alert("批量导出失败", describeExportFailure(error, "签字表 ZIP 生成失败"))
     } finally {
       setBatchBusy(false)
+    }
+  }
+
+  const handleSubmitWorkSummary = async () => {
+    if (!selectedEvaluation || savingWorkSummary) return
+    if (!workSummaryForm.work_summary.trim() || !workSummaryForm.work_risks.trim() || !workSummaryForm.support_needed.trim() || !workSummaryForm.next_plan.trim()) {
+      await Alert("总结未完成", "请填写工作总结、问题与风险、所需支持和后续计划。没有内容时填写“无”。")
+      return
+    }
+    setSavingWorkSummary(true)
+    try {
+      const response = await evaluationApi.submitWorkSummary(selectedEvaluation.id, workSummaryForm)
+      setSelectedEvaluation(response.data)
+      await fetchEvaluations()
+      toast.success("工作总结与后续计划已提交")
+    } catch (error) {
+      await Alert("总结提交失败", getErrorMessage(error, "工作总结提交失败，请重试"))
+    } finally {
+      setSavingWorkSummary(false)
     }
   }
 
@@ -1739,8 +1944,18 @@ export default function EvaluationsPage() {
     (evaluation: KPIEvaluation) => {
       setSelectedEvaluation(evaluation)
       setConfirmation(null)
+      setSignoffSupplements([])
+      setWorkflowTaskSummary(null)
+      setWorkSummaryForm({
+        work_summary: evaluation.work_summary || "",
+        work_risks: evaluation.work_risks || "",
+        support_needed: evaluation.support_needed || "",
+        next_plan: evaluation.next_plan || "",
+      })
       fetchEvaluationScores(evaluation.id)
+      if (isNewWorkflowEvaluation(evaluation)) fetchWorkflowTaskSummary(evaluation.id)
       fetchConfirmation(evaluation.id)
+      if (evaluation.status === "completed") fetchSignoffSupplements(evaluation.id)
       setScoreDialogOpen(true)
       setActiveTab("details")
 
@@ -1853,11 +2068,15 @@ export default function EvaluationsPage() {
   // 检查是否可以进行某个操作
   const canPerformAction = (evaluation: KPIEvaluation, action: "self" | "manager" | "hr" | "invite" | "confirm" | "submitObjection" | "handleObjection") => {
     if (!currentUser) return false
+	const newWorkflow = isNewWorkflowEvaluation(evaluation)
+	if (newWorkflow && ["manager", "hr", "invite"].includes(action)) return false
 
     switch (action) {
       case "self":
         // 任何人都可以对自己的考核进行自评（包括主管）
-        return evaluation.status === "pending" && evaluation.employee_id === currentUser.id
+        return ["pending", "self_evaluating"].includes(evaluation.status) &&
+          evaluation.employee_id === currentUser.id &&
+          (!evaluation.work_summary_required || Boolean(evaluation.work_summary_submitted_at))
       case "manager":
         // 主管只能评估自己直接下属的员工，但不能评估自己
         // 特殊情况：如果员工没有上级且是HR角色，HR可以手动推进状态（用于完成邀请评分后的状态推进）
@@ -1908,18 +2127,18 @@ export default function EvaluationsPage() {
         return false
       case "confirm":
         // 员工可以确认最终得分
-        return evaluation.status === "pending_confirm" && evaluation.employee_id === currentUser.id
+        return ["pending_confirm", "awaiting_employee_confirmation"].includes(evaluation.status) && evaluation.employee_id === currentUser.id
       case "submitObjection":
         // 员工可以在待确认状态时提交异议（且未提交过或已处理的异议）
         return (
-          evaluation.status === "pending_confirm" &&
+          ["pending_confirm", "awaiting_employee_confirmation"].includes(evaluation.status) &&
           evaluation.employee_id === currentUser.id &&
           !evaluation.has_objection &&
           !evaluation.objection_reason
         )
       case "handleObjection":
         // HR可以在有异议时处理异议
-        return evaluation.status === "pending_confirm" && evaluation.has_objection && isHR
+        return ["pending_confirm", "rejected"].includes(evaluation.status) && evaluation.has_objection && isHR
       default:
         return false
     }
@@ -1929,6 +2148,13 @@ export default function EvaluationsPage() {
   const getStatusProgress = (status: string) => {
     const statusMap = {
       pending: { step: 1, total: 5, label: "等待自评" },
+      draft: { step: 1, total: 5, label: "准备自评" },
+      self_evaluating: { step: 2, total: 5, label: "员工自评" },
+      scoring: { step: 3, total: 5, label: "按模板评分" },
+      awaiting_review: { step: 4, total: 5, label: "等待复核" },
+      awaiting_employee_confirmation: { step: 5, total: 5, label: "等待员工确认" },
+      rejected: { step: 3, total: 5, label: "异议/退回待处理" },
+      cancelled: { step: 0, total: 5, label: "已取消" },
       self_evaluated: { step: 2, total: 5, label: "等待主管评估" },
       manager_evaluated: { step: 3, total: 5, label: "等待HR审核" },
       pending_confirm: { step: 4, total: 5, label: "等待确认" },
@@ -1990,6 +2216,28 @@ export default function EvaluationsPage() {
                     placeholder="选择员工..."
                     maxDisplayTags={5}
                   />
+                  {templatePreviewLoading && <p className="text-sm text-muted-foreground">正在匹配适用模板和评分人...</p>}
+                  {templatePreviewError && <p className="text-sm text-amber-600">{templatePreviewError}</p>}
+                  {templatePreview && (
+                    <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium">自动匹配模板：{templatePreview.template.name}</span>
+                        <Badge variant="outline">V{templatePreview.template.version}</Badge>
+                        <Badge variant="outline">计算版本 {templatePreview.template.calculation_version}</Badge>
+                      </div>
+                      <div className="text-muted-foreground">
+                        评分人：{(templatePreview.scorer_candidates?.length
+                          ? templatePreview.scorer_candidates.map((scorer) => `${scorer.scorer_type}=${scorer.name}`).join("、")
+                          : Object.entries(templatePreview.scorers).map(([type, scorer]) => `${type}=${scorer.name}`).join("、")) || "未配置"}
+                      </div>
+                      {templatePreview.workflow_mode && <div className="text-muted-foreground">考核流程：{templatePreview.workflow_mode === "enabled" ? "已启用" : templatePreview.workflow_mode === "audit" ? "仅审计，未启用新版创建" : "新版流程未启用"}</div>}
+                      {templatePreview.ready === false && hasPermission("responsibility:view") && (
+                        <Button type="button" variant="outline" size="sm" asChild>
+                          <Link href="/evaluation-responsibilities"><Settings2 className="mr-2 h-4 w-4" />维护评分职责</Link>
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   <div className="flex flex-col gap-2">
                     <Label htmlFor="template">考核模板</Label>
                     <Select
@@ -2000,7 +2248,7 @@ export default function EvaluationsPage() {
                         <SelectValue placeholder="选择模板" />
                       </SelectTrigger>
                       <SelectContent>
-                        {templates.map(template => (
+                        {templates.filter(template => !template.status || template.status === "published").map(template => (
                           <SelectItem key={template.id} value={template.id.toString()}>
                             {template.name}
                           </SelectItem>
@@ -2081,6 +2329,30 @@ export default function EvaluationsPage() {
                       </Select>
                     </div>
                   )}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="project-name">项目名称（可选）</Label>
+                      <Input
+                        id="project-name"
+                        placeholder="例如：机器人控制器"
+                        value={formData.project_name}
+                        onChange={event => setFormData({ ...formData, project_name: event.target.value })}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-2">
+                      <Label htmlFor="allocation-ratio">项目投入占比（0–100%）</Label>
+                      <Input
+                        id="allocation-ratio"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        placeholder="例如：50"
+                        value={formData.allocation_ratio}
+                        onChange={event => setFormData({ ...formData, allocation_ratio: event.target.value })}
+                      />
+                    </div>
+                  </div>
                 </form>
               </DialogBody>
               <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:space-x-2 sm:gap-0">
@@ -2092,8 +2364,8 @@ export default function EvaluationsPage() {
                 >
                   取消
                 </Button>
-                <Button type="submit" form="evaluation-create-form" className="w-full sm:w-auto">
-                  创建
+                <Button type="submit" form="evaluation-create-form" className="w-full sm:w-auto" disabled={isCreatingEvaluation || templatePreviewLoading || templatePreview?.ready === false || !!templatePreviewError && formData.employee_ids.length === 1}>
+                  {isCreatingEvaluation ? "创建中..." : "创建"}
                 </Button>
               </DialogFooter>
             </DialogContent>
@@ -2330,6 +2602,12 @@ export default function EvaluationsPage() {
                 <SelectContent>
                   <SelectItem value="all">全部状态</SelectItem>
                   <SelectItem value="pending">等待自评</SelectItem>
+                  <SelectItem value="self_evaluating">员工自评</SelectItem>
+                  <SelectItem value="scoring">按模板评分</SelectItem>
+                  <SelectItem value="awaiting_review">等待复核</SelectItem>
+                  <SelectItem value="awaiting_employee_confirmation">等待员工确认</SelectItem>
+                  <SelectItem value="rejected">已退回</SelectItem>
+                  <SelectItem value="cancelled">已取消</SelectItem>
                   <SelectItem value="self_evaluated">等待主管评估</SelectItem>
                   <SelectItem value="manager_evaluated">等待HR审核</SelectItem>
                   <SelectItem value="pending_confirm">等待确认</SelectItem>
@@ -2343,9 +2621,9 @@ export default function EvaluationsPage() {
                   placeholder="员工筛选"
                   className="min-w-24 justify-between"
                   includeInactive={isHR}
-                  limitToDepartmentId={viewTab === "team" && isHR ? currentUser?.department_id : undefined}
-                  limitToManagerId={viewTab === "team" && isManager ? currentUser?.id : undefined}
-                  disabled={viewTab === "team" && isHR && !currentUser?.department_id}
+                  limitToDepartmentId={viewTab === "team" && isHR && currentUser?.data_scope !== "DEPARTMENT_TREE" ? currentUser?.department_id : undefined}
+                  limitToManagerId={viewTab === "team" && isManager && currentUser?.data_scope !== "DEPARTMENT_TREE" ? currentUser?.id : undefined}
+                  disabled={viewTab === "team" && isHR && currentUser?.data_scope !== "DEPARTMENT_TREE" && !currentUser?.department_id}
                 />
               )}
               <Button
@@ -2363,18 +2641,19 @@ export default function EvaluationsPage() {
         </CardHeader>
         <CardContent>
           {/* 绩效视图Tab */}
-          {(isManager || isHR) && (
+          {hasPermission("assessment:view") && (
             <div className="mb-6">
-              <Tabs value={viewTab} onValueChange={value => handleTabChange(value as "my" | "team" | "all")}>
-                <TabsList className={`grid w-full ${isHR ? "grid-cols-3 lg:w-[520px]" : "grid-cols-2 lg:w-[400px]"}`}>
+              <Tabs value={viewTab} onValueChange={value => handleTabChange(value as "my" | "team" | "all" | "assigned")}>
+                <TabsList className="flex h-auto w-full flex-wrap justify-start gap-1">
                   <TabsTrigger value="my" className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                     我的绩效
                   </TabsTrigger>
-                  <TabsTrigger value="team" className="flex items-center gap-2">
+                  {(isManager || isHR) && <TabsTrigger value="team" className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-green-500"></span>
                     团队绩效
-                  </TabsTrigger>
+                  </TabsTrigger>}
+                  <TabsTrigger value="assigned">待我评分</TabsTrigger>
                   {isHR && (
                     <TabsTrigger value="all" className="flex items-center gap-2">
                       <span className="w-2 h-2 rounded-full bg-purple-500"></span>
@@ -2552,25 +2831,27 @@ export default function EvaluationsPage() {
                     <Label className="text-sm text-muted-foreground">考核周期</Label>
                     <p className="text-sm font-medium">{getPeriodValue(selectedEvaluation)}</p>
                   </div>
-                  <div className="bg-muted/50 p-3 rounded flex flex-col gap-2">
+                <div className="bg-muted/50 p-3 rounded flex flex-col gap-2">
                     {/* 当前状态 */}
                     <div className="flex justify-between items-center">
                       <Label className="text-sm text-muted-foreground">当前状态</Label>
                       <div className="mt-1.5 space-y-2">{getStatusBadge(selectedEvaluation.status)}</div>
                     </div>
-                    {/* 状态进度条 */}
+                    {/* 新版流程进度由后端状态和任务完成度驱动；旧版保留兼容进度。 */}
                     <div className="flex justify-between items-end">
                       <Label className="text-sm text-muted-foreground">流程进度</Label>
                       <span className="text-xs text-muted-foreground">
-                        {getStatusProgress(selectedEvaluation.status).step} /{" "}
-                        {getStatusProgress(selectedEvaluation.status).total}
+                        {isNewWorkflowEvaluation(selectedEvaluation) && workflowTaskSummary
+                          ? `${workflowTaskSummary.completion.submitted}/${workflowTaskSummary.completion.required} 必填任务`
+                          : `${getStatusProgress(selectedEvaluation.status).step} / ${getStatusProgress(selectedEvaluation.status).total}`}
                       </span>
                     </div>
                     {(() => {
-                      const percent =
-                        (getStatusProgress(selectedEvaluation.status).step /
-                          getStatusProgress(selectedEvaluation.status).total) *
-                        100
+                      const percent = isNewWorkflowEvaluation(selectedEvaluation) && workflowTaskSummary
+                        ? workflowTaskSummary.completion.required === 0
+                          ? 100
+                          : (workflowTaskSummary.completion.submitted / workflowTaskSummary.completion.required) * 100
+                        : (getStatusProgress(selectedEvaluation.status).step / getStatusProgress(selectedEvaluation.status).total) * 100
                       let colorClass = "bg-gray-300"
                       if (percent >= 100) {
                         colorClass = "bg-green-600"
@@ -2595,6 +2876,50 @@ export default function EvaluationsPage() {
                   </div>
                 </div>
 
+                {/* 新版模板驱动评分任务；旧版考核无任务时保持原有评分详情展示。 */}
+                {isNewWorkflowEvaluation(selectedEvaluation) && (
+                  <Card className={selectedEvaluation.work_summary_submitted_at ? "border-green-200 dark:border-green-800" : "border-amber-200 dark:border-amber-800"}>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <FileSignature className="h-4 w-4" />
+                        工作总结与后续计划
+                        {selectedEvaluation.work_summary_submitted_at && <Badge variant="secondary">已提交</Badge>}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-xs text-muted-foreground">员工须先提交本期交付成果、问题风险、所需支持和下期计划，之后才能填写自评分。没有内容时填写“无”。</p>
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-2"><Label htmlFor="work-summary">本期工作总结</Label><Textarea id="work-summary" value={workSummaryForm.work_summary} disabled={!!selectedEvaluation.work_summary_submitted_at || selectedEvaluation.employee_id !== currentUser?.id} onChange={event => setWorkSummaryForm({ ...workSummaryForm, work_summary: event.target.value })} /></div>
+                        <div className="space-y-2"><Label htmlFor="work-risks">问题与风险</Label><Textarea id="work-risks" value={workSummaryForm.work_risks} disabled={!!selectedEvaluation.work_summary_submitted_at || selectedEvaluation.employee_id !== currentUser?.id} onChange={event => setWorkSummaryForm({ ...workSummaryForm, work_risks: event.target.value })} /></div>
+                        <div className="space-y-2"><Label htmlFor="support-needed">所需支持</Label><Textarea id="support-needed" value={workSummaryForm.support_needed} disabled={!!selectedEvaluation.work_summary_submitted_at || selectedEvaluation.employee_id !== currentUser?.id} onChange={event => setWorkSummaryForm({ ...workSummaryForm, support_needed: event.target.value })} /></div>
+                        <div className="space-y-2"><Label htmlFor="next-plan">下期计划、交付物与时间</Label><Textarea id="next-plan" value={workSummaryForm.next_plan} disabled={!!selectedEvaluation.work_summary_submitted_at || selectedEvaluation.employee_id !== currentUser?.id} onChange={event => setWorkSummaryForm({ ...workSummaryForm, next_plan: event.target.value })} /></div>
+                      </div>
+                      {!selectedEvaluation.work_summary_submitted_at && selectedEvaluation.employee_id === currentUser?.id && (
+                        <Button onClick={handleSubmitWorkSummary} disabled={savingWorkSummary}>
+                          {savingWorkSummary ? "提交中..." : "提交总结并继续"}
+                        </Button>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+                <EvaluationScoringTaskList
+                  key={`${selectedEvaluation.id}-${selectedEvaluation.status}`}
+                  evaluationId={selectedEvaluation.id}
+                  onUpdated={async () => {
+                    const response = await evaluationApi.getById(selectedEvaluation.id)
+                    setSelectedEvaluation(response.data)
+                    await fetchWorkflowTaskSummary(selectedEvaluation.id)
+                    await fetchEvaluations()
+                    await fetchEvaluationScores(selectedEvaluation.id)
+                  }}
+                />
+                {isNewWorkflowEvaluation(selectedEvaluation) && (
+                  <EvaluationSelfScoreList scores={scores} editable={canPerformAction(selectedEvaluation, "self")} onUpdated={async () => {
+                    await fetchEvaluationScores(selectedEvaluation.id)
+                    await fetchEvaluations()
+                  }} />
+                )}
+
                 {confirmation && (
                   <Card className="border-green-200 dark:border-green-800">
                     <CardContent className="p-4">
@@ -2605,7 +2930,7 @@ export default function EvaluationsPage() {
                             最终结果已{confirmation.method === "paper" ? "纸质签字确认" : "在线确认"}
                           </div>
                           <p className="text-sm text-muted-foreground">
-                            结果版本 V{confirmation.snapshot.version} · 确认时间{" "}
+                            签收快照 V{confirmation.snapshot.version} · 确认时间{" "}
                             {new Date(confirmation.confirmed_at).toLocaleString("zh-CN")}
                           </p>
                           {confirmation.signed_at && (
@@ -2622,6 +2947,36 @@ export default function EvaluationsPage() {
                           </Button>
                         )}
                       </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {selectedEvaluation.status === "completed" && signoffSupplements.length > 0 && (
+                  <Card className="border-blue-200 dark:border-blue-800">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm">补充纸质签字材料</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                      <p className="text-sm text-muted-foreground">
+                        以下材料是在员工在线确认后补充归档的纸质签字凭证，不会改变考核完成状态。
+                      </p>
+                      {signoffSupplements.map(supplement => (
+                        <div key={supplement.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-sm">
+                          <div className="space-y-0.5">
+                            <p className="font-medium">{supplement.attachment_name || "签字材料"}</p>
+                            <p className="text-muted-foreground">
+                              上传于 {new Date(supplement.uploaded_at).toLocaleString("zh-CN")}
+                              {supplement.signed_at ? ` · 签字日期 ${new Date(supplement.signed_at).toLocaleDateString("zh-CN")}` : ""}
+                            </p>
+                            {supplement.remark && <p className="text-muted-foreground whitespace-pre-wrap">{supplement.remark}</p>}
+                          </div>
+                          {supplement.attachment_name && (
+                            <Button variant="outline" size="sm" onClick={() => handleDownloadSupplement(supplement)}>
+                              <Download className="w-4 h-4 mr-1" /> 下载材料
+                            </Button>
+                          )}
+                        </div>
+                      ))}
                     </CardContent>
                   </Card>
                 )}
@@ -3065,7 +3420,7 @@ export default function EvaluationsPage() {
                       </div>
                     )}
 
-                    {scores.map(score => (
+                    {!isNewWorkflowEvaluation(selectedEvaluation) && scores.map(score => (
                       <Card key={score.id} role="score-item" data-score-id={score.id} className="border">
                         <CardContent className="px-4 py-2">
                           <div className="space-y-4">
@@ -3467,12 +3822,20 @@ export default function EvaluationsPage() {
                               )}
                             </div>
                             <p className="text-muted-foreground">
-                              满分 {formatScore(scores.reduce((acc, score) => acc + (score.item?.max_score || 0), 0))} 分
+                              {showsCanonicalSummary
+                                ? "统一加权得分满分 100 分"
+                                : `原始指标满分合计 ${formatScore(scores.reduce((acc, score) => acc + (score.item?.max_score || 0), 0))} 分`}
                             </p>
                           </div>
 
-                          {/* 计算邀请评分总分 */}
-                          {(() => {
+                          {showsCanonicalSummary && (
+                            <div className="rounded border bg-muted/30 p-3 text-sm text-muted-foreground">
+                              当前考核按统一评分任务和综合权重计算，旧版自评、主管、HR 单列字段不适用。
+                            </div>
+                          )}
+
+                          {/* 计算邀请评分总分（旧版流程） */}
+                          {!showsCanonicalSummary && (() => {
                             const invitationTotalScore = Object.values(invitationScores).reduce((total, scores) => {
                               return total + scores.reduce((sum, score) => sum + (score.score ?? 0), 0)
                             }, 0)
@@ -3813,23 +4176,25 @@ export default function EvaluationsPage() {
               </DialogBody>
 
               <DialogFooter className="flex-col sm:flex-row justify-end gap-2 sm:space-x-2 sm:gap-0">
-                {["pending_confirm", "completed"].includes(selectedEvaluation.status) &&
+                {["pending_confirm", "awaiting_employee_confirmation", "completed"].includes(selectedEvaluation.status) &&
                   hasPermission("report:export") && (
                     <Button variant="outline" onClick={() => handleExportResult("xlsx")} disabled={isExportingResult}>
                       {isExportingResult ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Download className="w-4 h-4 mr-1" />}
                       {isExportingResult ? "导出中..." : "导出 Excel"}
                     </Button>
                   )}
-                {["pending_confirm", "completed"].includes(selectedEvaluation.status) &&
+                {["pending_confirm", "awaiting_employee_confirmation", "completed"].includes(selectedEvaluation.status) &&
                   hasPermission("report:export") && (
                     <Button variant="outline" onClick={() => handleExportResult("pdf")} disabled={isExportingResult}>
                       {isExportingResult ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <FileSignature className="w-4 h-4 mr-1" />}
                       {isExportingResult ? "导出中..." : "导出 PDF"}
                     </Button>
                   )}
-                {selectedEvaluation.status === "pending_confirm" &&
-                  hasPermission("assessment:approve") &&
-                  !selectedEvaluation.has_objection && (
+                {canRegisterPaperSignoff(
+                  selectedEvaluation.status,
+                  hasPermission("assessment:approve"),
+                  selectedEvaluation.has_objection,
+                ) && (
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -3842,6 +4207,19 @@ export default function EvaluationsPage() {
                       <Upload className="w-4 h-4 mr-1" /> 登记纸质签字
                     </Button>
                   )}
+                {selectedEvaluation.status === "completed" && hasPermission("assessment:approve") && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSupplementSignedAt(new Date().toISOString().slice(0, 10))
+                      setSupplementRemark("")
+                      setSupplementFile(null)
+                      setSupplementDialogOpen(true)
+                    }}
+                  >
+                    <Upload className="w-4 h-4 mr-1" /> 补充纸质签字
+                  </Button>
+                )}
                 {canPerformAction(selectedEvaluation, "self") && (
                   <Button
                     onClick={() => handleCompleteStage(selectedEvaluation.id, "self")}
@@ -3951,6 +4329,48 @@ export default function EvaluationsPage() {
             <Button variant="outline" onClick={() => setPaperDialogOpen(false)} disabled={isSubmittingPaper}>取消</Button>
             <Button onClick={handlePaperConfirmation} disabled={isSubmittingPaper || !paperFile || !paperSignedAt}>
               {isSubmittingPaper ? "提交中..." : "确认归档并完成考核"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={supplementDialogOpen} onOpenChange={setSupplementDialogOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>补充纸质签字材料</DialogTitle>
+          </DialogHeader>
+          <DialogBody className="space-y-4 py-4">
+            <div className="rounded-lg border bg-muted/50 p-3 text-sm text-muted-foreground">
+              当前考核已经完成。补充上传只会增加纸质签字凭证和审计记录，不会改变考核结果或完成状态。
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplement-signed-at">签字日期（可选）</Label>
+              <Input id="supplement-signed-at" type="date" value={supplementSignedAt} onChange={e => setSupplementSignedAt(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplement-file">签字材料（PDF/JPG/PNG，最大10MB）</Label>
+              <Input
+                id="supplement-file"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                onChange={e => setSupplementFile(e.target.files?.[0] || null)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="supplement-remark">备注</Label>
+              <Textarea
+                id="supplement-remark"
+                value={supplementRemark}
+                maxLength={500}
+                onChange={e => setSupplementRemark(e.target.value)}
+                placeholder="可填写纸质材料编号或补充说明"
+              />
+            </div>
+          </DialogBody>
+          <DialogFooter className="justify-end gap-2">
+            <Button variant="outline" onClick={() => setSupplementDialogOpen(false)} disabled={isSubmittingSupplement}>取消</Button>
+            <Button onClick={handleSupplementUpload} disabled={isSubmittingSupplement || !supplementFile}>
+              {isSubmittingSupplement ? "提交中..." : "确认补充归档"}
             </Button>
           </DialogFooter>
         </DialogContent>

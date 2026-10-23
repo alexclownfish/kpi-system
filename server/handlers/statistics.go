@@ -1,15 +1,40 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 	"time"
 
 	"dootask-kpi-server/models"
 
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
+
+func authoritativeEvaluationTotal(db *gorm.DB, evaluation models.KPIEvaluation) float64 {
+	if !isNewWorkflowEvaluation(evaluation) {
+		return evaluation.TotalScore
+	}
+	var result models.EvaluationCalculationResult
+	if err := db.Where("evaluation_id = ?", evaluation.ID).Order("version DESC").First(&result).Error; err == nil {
+		return result.TotalScore
+	}
+	return evaluation.TotalScore
+}
+
+func averageAuthoritativeTotals(db *gorm.DB, evaluations []models.KPIEvaluation) float64 {
+	if len(evaluations) == 0 {
+		return 0
+	}
+	total := 0.0
+	for _, evaluation := range evaluations {
+		total += authoritativeEvaluationTotal(db, evaluation)
+	}
+	return total / float64(len(evaluations))
+}
 
 // 统计分析
 
@@ -113,11 +138,9 @@ func GetDashboardStats(c *gin.Context) {
 	completedQuery.Where("status = ?", "completed").Count(&stats.CompletedEvaluations)
 
 	// 计算筛选后的平均得分（只计算已完成的评估）
-	var avgResult struct {
-		AvgScore float64
-	}
-	avgQuery.Select("AVG(total_score) as avg_score").Where("status = ?", "completed").Scan(&avgResult)
-	stats.AverageScore = avgResult.AvgScore
+	var completedForAverage []models.KPIEvaluation
+	avgQuery.Where("status = ?", "completed").Find(&completedForAverage)
+	stats.AverageScore = averageAuthoritativeTotals(models.DB, completedForAverage)
 
 	// 获取最近的评估记录（应用相同的时间筛选，只显示在职员工的评估）
 	var recentEvals []models.KPIEvaluation
@@ -147,7 +170,7 @@ func GetDashboardStats(c *gin.Context) {
 					Name: eval.Employee.Department.Name,
 				},
 			},
-			TotalScore: eval.TotalScore,
+			TotalScore: authoritativeEvaluationTotal(models.DB, eval),
 			Status:     eval.Status,
 			Period:     eval.Period,
 			Year:       eval.Year,
@@ -213,15 +236,12 @@ func GetDepartmentStats(c *gin.Context) {
 		Where("employees.department_id = ? AND employees.is_active = ?", departmentId, true).
 		Count(&stats.EvaluationCount)
 
-	var avgResult struct {
-		AvgScore float64
-	}
+	var departmentCompleted []models.KPIEvaluation
 	models.DB.Model(&models.KPIEvaluation{}).
-		Select("AVG(total_score) as avg_score").
 		Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
 		Where("employees.department_id = ? AND employees.is_active = ? AND kpi_evaluations.status = ?", departmentId, true, "completed").
-		Scan(&avgResult)
-	stats.AverageScore = avgResult.AvgScore
+		Find(&departmentCompleted)
+	stats.AverageScore = averageAuthoritativeTotals(models.DB, departmentCompleted)
 
 	// 获取月度统计（最近6个月）
 	for i := 5; i >= 0; i-- {
@@ -238,14 +258,11 @@ func GetDepartmentStats(c *gin.Context) {
 			Where("employees.department_id = ? AND employees.is_active = ? AND kpi_evaluations.period LIKE ?", departmentId, true, month+"%").
 			Count(&monthStats.EvaluationCount)
 
-		var monthAvg struct {
-			AvgScore float64
-		}
+		var monthCompleted []models.KPIEvaluation
 		models.DB.Model(&models.KPIEvaluation{}).
-			Select("AVG(total_score) as avg_score").
 			Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
 			Where("employees.department_id = ? AND employees.is_active = ? AND kpi_evaluations.period LIKE ? AND kpi_evaluations.status = ?", departmentId, true, month+"%", "completed").
-			Scan(&monthAvg)
+			Find(&monthCompleted)
 
 		stats.MonthlyStats = append(stats.MonthlyStats, struct {
 			Month           string  `json:"month"`
@@ -254,24 +271,42 @@ func GetDepartmentStats(c *gin.Context) {
 		}{
 			Month:           month,
 			EvaluationCount: monthStats.EvaluationCount,
-			AverageScore:    monthAvg.AvgScore,
+			AverageScore:    averageAuthoritativeTotals(models.DB, monthCompleted),
 		})
 	}
 
 	// 获取部门top performers
-	var topPerformers []struct {
+	var departmentEvaluations []models.KPIEvaluation
+	models.DB.Model(&models.KPIEvaluation{}).
+		Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
+		Where("employees.department_id = ? AND employees.is_active = ? AND kpi_evaluations.status = ?", departmentId, true, "completed").
+		Find(&departmentEvaluations)
+	type performerAggregate struct {
+		Count int
+		Total float64
+	}
+	aggregates := map[uint]*performerAggregate{}
+	for _, evaluation := range departmentEvaluations {
+		aggregate := aggregates[evaluation.EmployeeID]
+		if aggregate == nil {
+			aggregate = &performerAggregate{}
+			aggregates[evaluation.EmployeeID] = aggregate
+		}
+		aggregate.Count++
+		aggregate.Total += authoritativeEvaluationTotal(models.DB, evaluation)
+	}
+	type performerRow struct {
 		EmployeeID   uint
 		AverageScore float64
 	}
-
-	models.DB.Model(&models.KPIEvaluation{}).
-		Select("employee_id, AVG(total_score) as average_score").
-		Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
-		Where("employees.department_id = ? AND employees.is_active = ? AND kpi_evaluations.status = ?", departmentId, true, "completed").
-		Group("employee_id").
-		Order("average_score DESC").
-		Limit(5).
-		Scan(&topPerformers)
+	topPerformers := make([]performerRow, 0, len(aggregates))
+	for employeeID, aggregate := range aggregates {
+		topPerformers = append(topPerformers, performerRow{EmployeeID: employeeID, AverageScore: aggregate.Total / float64(aggregate.Count)})
+	}
+	sort.Slice(topPerformers, func(i, j int) bool { return topPerformers[i].AverageScore > topPerformers[j].AverageScore })
+	if len(topPerformers) > 5 {
+		topPerformers = topPerformers[:5]
+	}
 
 	for _, performer := range topPerformers {
 		var employee models.Employee
@@ -332,20 +367,15 @@ func GetEmployeeStats(c *gin.Context) {
 	// 获取评估数量和平均分
 	models.DB.Model(&models.KPIEvaluation{}).Where("employee_id = ?", employeeId).Count(&stats.EvaluationCount)
 
-	var avgResult struct {
-		AvgScore float64
-	}
-	models.DB.Model(&models.KPIEvaluation{}).
-		Select("AVG(total_score) as avg_score").
-		Where("employee_id = ? AND status = ?", employeeId, "completed").
-		Scan(&avgResult)
-	stats.AverageScore = avgResult.AvgScore
+	var employeeCompleted []models.KPIEvaluation
+	models.DB.Where("employee_id = ? AND status = ?", employeeId, "completed").Find(&employeeCompleted)
+	stats.AverageScore = averageAuthoritativeTotals(models.DB, employeeCompleted)
 
 	// 获取最新评估分数
 	var latestEval models.KPIEvaluation
 	if err := models.DB.Where("employee_id = ? AND status = ?", employeeId, "completed").
 		Order("created_at DESC").First(&latestEval).Error; err == nil {
-		stats.LatestScore = latestEval.TotalScore
+		stats.LatestScore = authoritativeEvaluationTotal(models.DB, latestEval)
 	}
 
 	// 获取分数趋势（最近6次评估）
@@ -359,7 +389,7 @@ func GetEmployeeStats(c *gin.Context) {
 			Score  float64 `json:"score"`
 		}{
 			Period: evaluations[i].Period,
-			Score:  evaluations[i].TotalScore,
+			Score:  authoritativeEvaluationTotal(models.DB, evaluations[i]),
 		})
 	}
 
@@ -374,9 +404,56 @@ func GetEmployeeStats(c *gin.Context) {
 		Select("kpi_items.name as item_name, AVG(kpi_scores.final_score) as average_score, kpi_items.max_score").
 		Joins("JOIN kpi_items ON kpi_scores.item_id = kpi_items.id").
 		Joins("JOIN kpi_evaluations ON kpi_scores.evaluation_id = kpi_evaluations.id").
-		Where("kpi_evaluations.employee_id = ? AND kpi_scores.final_score IS NOT NULL", employeeId).
+		Where("kpi_evaluations.employee_id = ? AND kpi_evaluations.status = ? AND COALESCE(kpi_evaluations.calculation_version, '') <> ? AND kpi_scores.final_score IS NOT NULL", employeeId, "completed", canonicalCalculationVersion).
 		Group("kpi_items.id, kpi_items.name, kpi_items.max_score").
 		Scan(&kpiBreakdown)
+	// Weighted assessments use immutable canonical item results, never the
+	// compatibility KPIScore final_score fields (which remain empty).
+	type itemAggregate struct {
+		Name            string
+		MaxScore, Total float64
+		Count           int
+	}
+	canonicalItems := map[string]*itemAggregate{}
+	for _, evaluation := range employeeCompleted {
+		if !isNewWorkflowEvaluation(evaluation) {
+			continue
+		}
+		var stored models.EvaluationCalculationResult
+		if models.DB.Where("evaluation_id = ?", evaluation.ID).Order("version DESC").First(&stored).Error != nil {
+			continue
+		}
+		var result canonicalEvaluationResult
+		if json.Unmarshal([]byte(stored.ResultJSON), &result) != nil {
+			continue
+		}
+		for _, item := range result.Items {
+			if item.AggregatedScore == nil || item.NotApplicable {
+				continue
+			}
+			key := fmt.Sprintf("%d:%s:%g", item.ItemID, item.Name, item.MaxScore)
+			aggregate := canonicalItems[key]
+			if aggregate == nil {
+				aggregate = &itemAggregate{Name: item.Name, MaxScore: item.MaxScore}
+				canonicalItems[key] = aggregate
+			}
+			aggregate.Total += *item.AggregatedScore
+			aggregate.Count++
+		}
+	}
+	keys := make([]string, 0, len(canonicalItems))
+	for key := range canonicalItems {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		item := canonicalItems[key]
+		kpiBreakdown = append(kpiBreakdown, struct {
+			ItemName     string
+			AverageScore float64
+			MaxScore     float64
+		}{item.Name, item.Total / float64(item.Count), item.MaxScore})
+	}
 
 	for _, item := range kpiBreakdown {
 		stats.KPIBreakdown = append(stats.KPIBreakdown, struct {
@@ -415,26 +492,7 @@ func GetTrends(c *gin.Context) {
 
 	trends.PeriodType = period
 
-	// 获取时间段列表
-	var periods []string
-	switch period {
-	case "monthly":
-		for i := 11; i >= 0; i-- {
-			date := time.Now().AddDate(0, -i, 0)
-			periods = append(periods, date.Format("2006-01"))
-		}
-	case "quarterly":
-		for i := 7; i >= 0; i-- {
-			date := time.Now().AddDate(0, -i*3, 0)
-			quarter := (date.Month()-1)/3 + 1
-			periods = append(periods, fmt.Sprintf("%d-Q%d", date.Year(), quarter))
-		}
-	case "yearly":
-		for i := 4; i >= 0; i-- {
-			date := time.Now().AddDate(-i, 0, 0)
-			periods = append(periods, fmt.Sprintf("%d", date.Year()))
-		}
-	}
+	periods := trendPeriods(time.Now(), period)
 
 	// 获取每个时间段的统计数据
 	for _, p := range periods {
@@ -444,28 +502,37 @@ func GetTrends(c *gin.Context) {
 		}
 
 		var pattern string
+		var year, bucket int
 		switch period {
 		case "monthly":
 			pattern = p + "%"
+			fmt.Sscanf(p, "%d-%d", &year, &bucket)
 		case "quarterly":
 			pattern = p + "%"
+			fmt.Sscanf(p, "%d-Q%d", &year, &bucket)
 		case "yearly":
 			pattern = p + "%"
+			fmt.Sscanf(p, "%d", &year)
 		}
+		condition := "kpi_evaluations.period LIKE ? OR (kpi_evaluations.period = ? AND kpi_evaluations.year = ?"
+		args := []any{pattern, period, year}
+		if period == "monthly" {
+			condition += " AND kpi_evaluations.month = ?"
+			args = append(args, bucket)
+		}
+		if period == "quarterly" {
+			condition += " AND kpi_evaluations.quarter = ?"
+			args = append(args, bucket)
+		}
+		condition += ")"
 
+		var completed []models.KPIEvaluation
 		models.DB.Model(&models.KPIEvaluation{}).
 			Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
-			Where("kpi_evaluations.period LIKE ? AND kpi_evaluations.status = ? AND employees.is_active = ?", pattern, "completed", true).
-			Count(&periodStats.EvaluationCount)
-
-		var avgResult struct {
-			AvgScore float64
-		}
-		models.DB.Model(&models.KPIEvaluation{}).
-			Select("AVG(kpi_evaluations.total_score) as avg_score").
-			Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
-			Where("kpi_evaluations.period LIKE ? AND kpi_evaluations.status = ? AND employees.is_active = ?", pattern, "completed", true).
-			Scan(&avgResult)
+			Where("kpi_evaluations.status = ? AND employees.is_active = ?", "completed", true).
+			Where("("+condition+")", args...).
+			Find(&completed)
+		periodStats.EvaluationCount = int64(len(completed))
 
 		trends.ScoreTrends = append(trends.ScoreTrends, struct {
 			Period          string  `json:"period"`
@@ -473,26 +540,53 @@ func GetTrends(c *gin.Context) {
 			EvaluationCount int64   `json:"evaluation_count"`
 		}{
 			Period:          p,
-			AverageScore:    avgResult.AvgScore,
+			AverageScore:    averageAuthoritativeTotals(models.DB, completed),
 			EvaluationCount: periodStats.EvaluationCount,
 		})
 	}
 
 	// 获取部门趋势
-	var deptTrends []struct {
+	var completedForDepartments []models.KPIEvaluation
+	models.DB.Model(&models.KPIEvaluation{}).
+		Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
+		Where("kpi_evaluations.status = ? AND employees.is_active = ?", "completed", true).
+		Find(&completedForDepartments)
+	type departmentAggregate struct {
+		Name  string
+		Count int64
+		Total float64
+	}
+	departmentAggregates := map[uint]*departmentAggregate{}
+	for _, evaluation := range completedForDepartments {
+		var employee models.Employee
+		if models.DB.Select("department_id").First(&employee, evaluation.EmployeeID).Error != nil {
+			continue
+		}
+		var department models.Department
+		if models.DB.Select("name").First(&department, employee.DepartmentID).Error != nil {
+			continue
+		}
+		aggregate := departmentAggregates[employee.DepartmentID]
+		if aggregate == nil {
+			aggregate = &departmentAggregate{Name: department.Name}
+			departmentAggregates[employee.DepartmentID] = aggregate
+		}
+		aggregate.Count++
+		aggregate.Total += authoritativeEvaluationTotal(models.DB, evaluation)
+	}
+	deptTrends := make([]struct {
 		DepartmentName  string
 		AverageScore    float64
 		EvaluationCount int64
+	}, 0, len(departmentAggregates))
+	for _, aggregate := range departmentAggregates {
+		deptTrends = append(deptTrends, struct {
+			DepartmentName  string
+			AverageScore    float64
+			EvaluationCount int64
+		}{DepartmentName: aggregate.Name, AverageScore: aggregate.Total / float64(aggregate.Count), EvaluationCount: aggregate.Count})
 	}
-
-	models.DB.Model(&models.KPIEvaluation{}).
-		Select("departments.name as department_name, AVG(kpi_evaluations.total_score) as average_score, COUNT(*) as evaluation_count").
-		Joins("JOIN employees ON kpi_evaluations.employee_id = employees.id").
-		Joins("JOIN departments ON employees.department_id = departments.id").
-		Where("kpi_evaluations.status = ? AND employees.is_active = ?", "completed", true).
-		Group("departments.id, departments.name").
-		Order("average_score DESC").
-		Scan(&deptTrends)
+	sort.Slice(deptTrends, func(i, j int) bool { return deptTrends[i].AverageScore > deptTrends[j].AverageScore })
 
 	for _, dept := range deptTrends {
 		trends.DepartmentTrends = append(trends.DepartmentTrends, struct {
@@ -509,6 +603,27 @@ func GetTrends(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"data": trends,
 	})
+}
+
+func trendPeriods(now time.Time, period string) []string {
+	anchor := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	periods := []string{}
+	switch period {
+	case "monthly":
+		for i := 11; i >= 0; i-- {
+			periods = append(periods, anchor.AddDate(0, -i, 0).Format("2006-01"))
+		}
+	case "quarterly":
+		for i := 7; i >= 0; i-- {
+			date := anchor.AddDate(0, -i*3, 0)
+			periods = append(periods, fmt.Sprintf("%d-Q%d", date.Year(), (date.Month()-1)/3+1))
+		}
+	case "yearly":
+		for i := 4; i >= 0; i-- {
+			periods = append(periods, fmt.Sprintf("%d", now.Year()-i))
+		}
+	}
+	return periods
 }
 
 // 导出功能（简化版，实际应用中需要使用Excel库）
@@ -639,6 +754,7 @@ func GetStatisticsData(c *gin.Context) {
 	// 最近评估结构
 	type RecentEvaluation struct {
 		ID         uint    `json:"id"`
+		EmployeeID uint    `json:"employee_id"`
 		Employee   string  `json:"employee"`
 		Department string  `json:"department"`
 		Template   string  `json:"template"`
@@ -828,6 +944,7 @@ func GetStatisticsData(c *gin.Context) {
 	for _, eval := range recentEvals {
 		response.RecentEvaluations = append(response.RecentEvaluations, RecentEvaluation{
 			ID:         eval.ID,
+			EmployeeID: eval.EmployeeID,
 			Employee:   eval.Employee.Name,
 			Department: eval.Employee.Department.Name,
 			Template:   eval.Template.Name,

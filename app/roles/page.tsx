@@ -1,9 +1,8 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import axios from "axios"
 import { Copy, Edit, Plus, Search, ShieldCheck, Trash2, Users } from "lucide-react"
-import { accessControlApi, employeeApi, type DataScope, type Employee, type Permission, type Role, type RoleMutationRequest } from "@/lib/api"
+import { accessControlApi, employeeApi, getApiErrorMessage as errorMessage, type DataScope, type Employee, type Permission, type Role, type RoleMutationRequest } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { useAuth } from "@/lib/auth-context"
 import { Badge } from "@/components/ui/badge"
@@ -27,6 +26,7 @@ const resourceLabels: Record<string, string> = {
   review: "评分邀请",
   report: "报表",
   role: "角色",
+  responsibility: "评分职责",
   system: "系统",
   audit: "审计",
 }
@@ -39,14 +39,9 @@ const emptyForm: RoleMutationRequest = {
   permission_ids: [],
 }
 
-function errorMessage(error: unknown, fallback: string) {
-  if (axios.isAxiosError(error)) return error.response?.data?.error || fallback
-  return fallback
-}
-
 export default function RolesPage() {
   const { Alert, Confirm } = useAppContext()
-  const { user, hasPermission } = useAuth()
+  const { user, hasPermission, refreshUser } = useAuth()
   const [roles, setRoles] = useState<Role[]>([])
   const [permissions, setPermissions] = useState<Permission[]>([])
   const [scopes, setScopes] = useState<DataScope[]>([])
@@ -143,6 +138,7 @@ export default function RolesPage() {
       }
       setDialogOpen(false)
       await fetchRoles()
+      await refreshUser()
     } catch (error) {
       await Alert("保存失败", errorMessage(error, "角色保存失败，请检查输入后重试。"))
     } finally {
@@ -240,7 +236,7 @@ export default function RolesPage() {
                   <TableCell><div className="flex justify-end gap-1">
                     <Button variant="ghost" size="icon" title="查看用户" onClick={() => openUsers(role)}><Users className="h-4 w-4" /></Button>
                     {canCreate && <Button variant="ghost" size="icon" title="复制角色" onClick={() => cloneRole(role)}><Copy className="h-4 w-4" /></Button>}
-                    {canEdit && !role.is_system && <Button variant="ghost" size="icon" title="编辑角色" onClick={() => openEdit(role)}><Edit className="h-4 w-4" /></Button>}
+                    {canEdit && role.code !== "super_admin" && <Button variant="ghost" size="icon" title="编辑角色" aria-label={`编辑角色：${role.name}`} onClick={() => openEdit(role)}><Edit className="h-4 w-4" /></Button>}
                     {canDelete && !role.is_system && <Button variant="ghost" size="icon" title="删除角色" onClick={() => deleteRole(role)} disabled={(role.user_count || 0) > 0}><Trash2 className="h-4 w-4 text-destructive" /></Button>}
                   </div></TableCell>
                 </TableRow>
@@ -255,10 +251,10 @@ export default function RolesPage() {
           <DialogHeader><DialogTitle>{editingRole ? `编辑角色：${editingRole.name}` : "新增自定义角色"}</DialogTitle></DialogHeader>
           <DialogBody className="space-y-6">
             <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2"><Label>角色名称</Label><Input value={form.name} maxLength={50} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="例如：绩效复核员" /></div>
+              <div className="space-y-2"><Label>角色名称</Label><Input value={form.name} disabled={editingRole?.is_system} maxLength={50} onChange={event => setForm(current => ({ ...current, name: event.target.value }))} placeholder="例如：绩效复核员" /></div>
               <div className="space-y-2"><Label>数据范围</Label><Select value={form.data_scope_code} onValueChange={value => setForm(current => ({ ...current, data_scope_code: value }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{scopes.map(scope => <SelectItem key={scope.code} value={scope.code}>{scope.name}</SelectItem>)}</SelectContent></Select></div>
               <div className="space-y-2 md:col-span-2"><Label>角色说明</Label><Textarea value={form.description} onChange={event => setForm(current => ({ ...current, description: event.target.value }))} placeholder="说明该角色的职责和适用对象" /></div>
-              <div className="flex items-center justify-between rounded-lg border p-3 md:col-span-2"><div><Label>必须设置直属上级</Label><p className="text-xs text-muted-foreground">分配该角色时，用户必须已设置直属上级。</p></div><Switch checked={form.requires_manager} onCheckedChange={checked => setForm(current => ({ ...current, requires_manager: checked }))} /></div>
+              <div className="flex items-center justify-between rounded-lg border p-3 md:col-span-2"><div><Label>必须设置直属上级</Label><p className="text-xs text-muted-foreground">分配该角色时，用户必须已设置直属上级。</p></div><Switch disabled={editingRole?.is_system} checked={form.requires_manager} onCheckedChange={checked => setForm(current => ({ ...current, requires_manager: checked }))} /></div>
             </div>
             <div className="space-y-3">
               <div><Label>功能权限</Label><p className="text-xs text-muted-foreground">选择写操作时，系统会自动补充同模块的查看权限。你不能授予自己没有的权限。</p></div>

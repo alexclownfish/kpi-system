@@ -1,0 +1,2638 @@
+{
+  "version": "hongxing-catalog-v1",
+  "source_sha256": "c3f8749e6ebc046cff88a3b5d052ee7a81fad4766c2678907e6d0be01b6997c0",
+  "source_filename": "荭杏研发项目绩效考核表.xlsx",
+  "profiles": [
+    {
+      "sheet": "01-ID工业设计",
+      "department": "ID 工业设计部",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "ID 设计里程碑达成率（部门/个人）",
+              "item_weight": 60,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "节点按计划完成 ≥90% 得满分，每低 5% 扣 5 分\n数据来源《项目计划》",
+              "data_source": "",
+              "order": 0,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "设计评审通过率（部门/个人）",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "一次评审通过得满分，每低 5% 扣 5 分\n数据来源《项目计划》",
+              "data_source": "",
+              "order": 1,
+              "source_row": 14,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "造型落地性（因 ID 造型导致结构返工）",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "0 次得满分，每发生 1 次扣 10 分\n数据来源《项目计划》",
+              "data_source": "",
+              "order": 2,
+              "source_row": 15,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "需求与变更响应及时率（部门/个人）",
+              "item_weight": 60,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "响应 ≤2 个工作日得满分，每增加 2 天扣 5 分\n数据来源《变更&禅道&问题登记表》",
+              "data_source": "",
+              "order": 3,
+              "source_row": 16,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "跨部门协同评价（结论由上下游反馈，PM 负责收集数据，最终结果由 PM 输出）",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "PM打分，≥85 分得满分\n数据来源《协同人打分》打分记录",
+              "data_source": "",
+              "order": 4,
+              "source_row": 17,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "设计复用与素材库沉淀",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "复用率 ≥30% 得满分\n数据来源《项目交付物管理》",
+              "data_source": "",
+              "order": 5,
+              "source_row": 18,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "流程合规与归档及时性",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "按期归档 100% 得满分\n数据来源《项目交付物管理》",
+              "data_source": "",
+              "order": 6,
+              "source_row": 19,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 20,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "产品定义与使用场景要求的实现符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按产品定义逐项核对 ID 方案对使用场景需求的覆盖度（0–100）\n数据来源《产品数据》",
+              "data_source": "",
+              "order": 8,
+              "source_row": 21,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "01-ID工业设计",
+      "department": "ID 工业设计部",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分，每低 5% 扣 5 分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 46,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "方案评审通过率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "一次性通过得满分，超过2次以上，每一次扣5分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 47,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 50,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 2,
+              "source_row": 48,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "协同支持评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "PM 与协同方平均分，PM收集数据",
+              "data_source": "",
+              "order": 3,
+              "source_row": 49,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "素材归档与命名规范",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "抽检合格率 100% 得满分，少5%，-5分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 50,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人设计输出与需求场景的一致性",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 5,
+              "source_row": 51,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "02-结构部门",
+      "department": "结构部门",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "结构设计里程碑达成率（交期）",
+              "item_weight": 70,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "图纸/BOM 交付齐套率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "设计评审通过率",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85% 得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "因设计原因的模具修改次数",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤2 次/项目，每超 1 次扣 10 分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "变更闭环率（设计、物料）",
+              "item_weight": 60,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "跨部门协同评价",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85 分得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "零件标准化与复用率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥60% 得满分",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "图纸归档及时性",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 8,
+              "source_row": 16,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "结构方案对产品需求规格的满足度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求规格（尺寸/重量/结构功能）核对满足度（0–100）",
+              "data_source": "",
+              "order": 9,
+              "source_row": 17,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "02-结构部门",
+      "department": "结构部门",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "图纸/BOM 下游驳回次数",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "0 次满分，每次扣 10 分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 27,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "设计评审通过率",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "试产暴露问题 ≤2 项得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 50,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 29,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "变更响应及时率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤2 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 30,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "归档规范（设计、物料、组装SOP等）",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥70% 得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 31,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人交付对需求规格的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 32,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "03-电子部门",
+      "department": "电子部门",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "投板计划达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "投板成功率",
+              "item_weight": 70,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "一次投板成功为满分，超过2次以上，每增加一次扣5分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "EMC/安规测试一次通过率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分（硬件测试输出，PM收集）",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "与结构/嵌入式联调配合评价（协同）",
+              "item_weight": 70,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85 分得满分（PM收集反馈意见）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "物料降本与量产/国外市场/国产化达成",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成目标值得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "设计文档与归档",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "硬件方案对产品规格书指标的满足度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按产品规格书逐项核对硬件指标满足度（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "03-电子部门",
+      "department": "电子部门",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "投板成功率",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "电源/信号完整性指标达成",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成规格得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 50,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 27,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "联调支持与响应",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "BOM 成本控制",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "不超目标成本得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 29,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "原理图/PCB 归档规范",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 6,
+              "source_row": 30,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人交付对硬件规格的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 31,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "04-软件应用开发",
+      "department": "软件应用开发部",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "版本发布计划达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "代码阻塞/重要缺陷密度",
+              "item_weight": 73,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤基线阈值得满分（测试输出数据，PM收集）",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "需求变更响应及时率",
+              "item_weight": 70,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤2 个工作日得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "接口协同评价（下游，和同级部门验收）",
+              "item_weight": 70,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85 分得满分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "代码复用率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥30% 得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "Code Review 与归档合规",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "软件功能对产品需求的实现符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单核对功能实现完整度（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "04-软件应用开发",
+      "department": "软件应用开发部",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 23,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "本人模块阻塞/重要缺陷密度",
+              "item_weight": 30,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤基线阈值得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "提测打回次数",
+              "item_weight": 20,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 次得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 50,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 26,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "联调与变更响应",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 27,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "代码规范与注释文档",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "抽检合格得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人功能交付对需求清单的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 29,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "05-算法开发",
+      "department": "算法开发部",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "算法交付节点达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "仿真与实机指标偏差率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤10% 得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "SOR 算法指标达成率（精度/召回/识别率）",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 达成得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "与运控/软件联调配合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85 分得满分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "模型库/参数库沉淀",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "每项目沉淀 ≥2 项得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "实验记录与文档",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "算法性能对产品定义指标的满足度与场景适配性",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理结合指标达成与真实场景表现综合评价（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "05-算法开发",
+      "department": "算法开发部",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "本人模块实机指标达成",
+              "item_weight": 15,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成规格得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "数据对比报告质量（测试文件）",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "评审通过得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 75,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 27,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "联调支持与响应",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "实验可复现性",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "抽检可复现得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 29,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人算法指标对需求定义的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 30,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "06-运动控制",
+      "department": "运控部",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "运控集成节点达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "运控指标验证成功率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成 SOR 得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "运控稳定性（测试数据）",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "0 次得满分，发生 1 次扣 25 分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "与算法/嵌入式联调配合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85 分得满分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "调参记录与版本管理",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "每项目输出标准参数包得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "运控性能（精度/节拍）对产品需求的满足度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理评价运控指标对产品定义性能要求的满足度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "06-运动控制",
+      "department": "运控部",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 23,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "运控指标验证成功率",
+              "item_weight": 15,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成规格得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "运控稳定性（测试数据）",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达标得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 75,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 26,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "联调与变更响应",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 27,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "参数整定记录与文档",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "完整可追溯得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人运控指标对需求定义的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 29,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "07-测试部门",
+      "department": "测试部门",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "测试计划执行达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "缺陷逃逸率（漏测到下游/客户端）",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤5% 得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "测试报告及时性与准确性",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥95% 按期得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "缺陷回归响应时长",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤2 个工作日得满分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "测试用例复用率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥50% 得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "测试设备与环境成本控制",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "不超预算得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "测试覆盖对产品需求的验证完整度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理评价测试用例对需求规格的覆盖完整度（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "07-测试部门",
+      "department": "测试部门",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "本人负责范围漏测缺陷数",
+              "item_weight": 15,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "0 个满分，每个扣 10 分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "缺陷报告质量（可复现率）",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥95% 得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 75,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 27,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "回归测试及时率（上游负责给出分数）",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤2 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "用例库沉淀与维护",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "每项目新增用例入库得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 29,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人测试用例对需求条目的覆盖完整度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 30,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "08-嵌入式开发",
+      "department": "嵌入式开发部",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "固件版本节点达成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "通信稳定性（丢包率/错误帧）",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达标得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "软硬件版本一致性（确保软硬版本同步）",
+              "item_weight": 30,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "台账一致率 100% 得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "功能安全验证一次通过率",
+              "item_weight": 30,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分（STO/SS1/SLS）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "变更闭环率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "文档与归档",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥50% 得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "嵌入式功能对产品需求的实现符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求规格逐项核对固件功能满足度（0–100）",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "08-嵌入式开发",
+      "department": "嵌入式开发部",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 24,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "本人模块缺陷密度",
+              "item_weight": 15,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤基线阈值得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 25,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "版本发布一致性（嵌入式版本和硬件版本挂钩）",
+              "item_weight": 10,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "无私自改版本得满分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 75,
+              "scorer_types": [
+                "DEPARTMENT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 3,
+              "source_row": 27,
+              "source_scorer_label": "部门负责人"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "联调与变更响应",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 28,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "代码规范与驱动文档",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "抽检合格得满分",
+              "data_source": "",
+              "order": 5,
+              "source_row": 29,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品经理评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人固件交付对需求规格的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "PRODUCT_MANAGER"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 6,
+              "source_row": 30,
+              "source_scorer_label": "产品经理"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "09-产品部门",
+      "department": "产品部门",
+      "position": "部门负责人",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 15,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "需求/PRD 交付节点达成率",
+              "item_weight": 60,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "节点按计划完成 ≥90% 得满分，每低 5% 扣 5 分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 8,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "需求基线冻结及时率",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "按里程碑完成基线冻结得满分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 9,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 15,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "需求评审一次通过率",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85% 得满分，每低 5% 扣 5 分",
+              "data_source": "",
+              "order": 2,
+              "source_row": 10,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "下游发现的需求遗漏/歧义次数",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "0 次得满分，每次扣 10 分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 11,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 10,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "需求变更闭环率",
+              "item_weight": 60,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 得满分（含变更后需求回写与通知）",
+              "data_source": "",
+              "order": 4,
+              "source_row": 12,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "需求澄清与协同响应评价",
+              "item_weight": 40,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日响应得满分，协同方反馈佐证",
+              "data_source": "",
+              "order": 5,
+              "source_row": 13,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 10,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "产品定义目标成本达成",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "达成 SOR 目标成本得满分，超出 5% 内扣 10 分",
+              "data_source": "",
+              "order": 6,
+              "source_row": 14,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "需求文档规范与归档",
+              "item_weight": 50,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 按期归档得满分",
+              "data_source": "",
+              "order": 7,
+              "source_row": 15,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 30,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "团队管理、人才梯队建设与跨项目技术决策综合评价",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由 CTO 结合团队整体交付、平台沉淀与管理动作综合打分（0–100）",
+              "data_source": "",
+              "order": 8,
+              "source_row": 16,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "CTO 综合评价",
+          "weight": 20,
+          "sort_order": 5,
+          "items": [
+            {
+              "name": "需求定义与客户 SOR / 市场需求的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理岗（跨产品线）或产品委员会评价需求定义的准确性与完整性（0–100）",
+              "data_source": "",
+              "order": 9,
+              "source_row": 17,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "sheet": "09-产品部门",
+      "department": "产品部门",
+      "position": "工程师",
+      "period": "monthly",
+      "dimensions": [
+        {
+          "name": "交付及时性",
+          "weight": 20,
+          "sort_order": 0,
+          "items": [
+            {
+              "name": "本人任务按期完成率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥90% 得满分",
+              "data_source": "",
+              "order": 0,
+              "source_row": 26,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "交付质量",
+          "weight": 40,
+          "sort_order": 1,
+          "items": [
+            {
+              "name": "需求文档评审一次通过率",
+              "item_weight": 25,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≥85% 得满分，每低 5% 扣 5 分",
+              "data_source": "",
+              "order": 1,
+              "source_row": 27,
+              "source_scorer_label": "PM"
+            },
+            {
+              "name": "部门负责人质量评价（返工控制、技术纪律、缺陷整改及时性）",
+              "item_weight": 75,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由部门负责人结合本人日常质量表现打分（0–100）",
+              "data_source": "",
+              "order": 2,
+              "source_row": 28,
+              "source_scorer_label": "CTO"
+            }
+          ]
+        },
+        {
+          "name": "协同与变更",
+          "weight": 15,
+          "sort_order": 2,
+          "items": [
+            {
+              "name": "需求变更与澄清响应及时率",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "≤1 个工作日得满分",
+              "data_source": "",
+              "order": 3,
+              "source_row": 29,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "成本与规范",
+          "weight": 5,
+          "sort_order": 3,
+          "items": [
+            {
+              "name": "需求文档规范与归档",
+              "item_weight": 100,
+              "scorer_types": [
+                "PM"
+              ],
+              "required": true,
+              "scoring_guidance": "100% 按期归档得满分",
+              "data_source": "",
+              "order": 4,
+              "source_row": 30,
+              "source_scorer_label": "PM"
+            }
+          ]
+        },
+        {
+          "name": "产品部门综合评价",
+          "weight": 20,
+          "sort_order": 4,
+          "items": [
+            {
+              "name": "个人需求文档与客户/市场需求的符合度",
+              "item_weight": 100,
+              "scorer_types": [
+                "CTO"
+              ],
+              "required": true,
+              "scoring_guidance": "由产品经理按需求清单逐条核对个人交付的符合度与需求响应配合度（0–100）",
+              "data_source": "",
+              "order": 5,
+              "source_row": 31,
+              "source_scorer_label": "产品团队负责人（如果没有就是CTO）"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -39,7 +39,7 @@ func GetEmployees(c *gin.Context) {
 	// 添加搜索条件
 	if search != "" {
 		searchPattern := "%" + search + "%"
-		query = query.Where("name LIKE ? OR email LIKE ? OR position LIKE ?",
+		query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR LOWER(position) LIKE LOWER(?)",
 			searchPattern, searchPattern, searchPattern)
 	}
 
@@ -68,7 +68,7 @@ func GetEmployees(c *gin.Context) {
 	countQuery := ApplyEmployeeScope(models.DB.Model(&models.Employee{}), currentUserID)
 	if search != "" {
 		searchPattern := "%" + search + "%"
-		countQuery = countQuery.Where("name LIKE ? OR email LIKE ? OR position LIKE ?",
+		countQuery = countQuery.Where("LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR LOWER(position) LIKE LOWER(?)",
 			searchPattern, searchPattern, searchPattern)
 	}
 	if departmentID != "" {
@@ -96,7 +96,7 @@ func GetEmployees(c *gin.Context) {
 
 	// 分页查询
 	offset := (page - 1) * pageSize
-	result := query.Offset(offset).Limit(pageSize).Find(&employees)
+	result := query.Order("employees.id ASC").Offset(offset).Limit(pageSize).Find(&employees)
 	if result.Error != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "获取员工列表失败",
@@ -187,9 +187,9 @@ func CreateEmployee(c *gin.Context) {
 		})
 		return
 	}
-	if requiresManager {
-		if validationError := validateManagerAssignment(employee.ManagerID, employee.DepartmentID); validationError != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
+	if employee.ManagerID != nil {
+		if err := managerAssignmentError(models.DB, employee, *employee.ManagerID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 	}
@@ -302,12 +302,20 @@ func UpdateEmployee(c *gin.Context) {
 		return
 	}
 
-	var updateData UpdateEmployeeRequest
+	updateData := UpdateEmployeeRequest{Name: employee.Name, Email: employee.Email, Position: employee.Position, DepartmentID: employee.DepartmentID, IsActive: employee.IsActive}
+	if employee.ManagerID != nil {
+		managerID := *employee.ManagerID
+		updateData.ManagerID = &managerID
+	}
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
 			"message": err.Error(),
 		})
+		return
+	}
+	if strings.TrimSpace(updateData.Name) == "" || strings.TrimSpace(updateData.Email) == "" {
+		c.JSON(400, gin.H{"error": "员工姓名和邮箱不能为空"})
 		return
 	}
 	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
@@ -358,19 +366,19 @@ func UpdateEmployee(c *gin.Context) {
 	}
 	targetManagerID := updateData.ManagerID
 	targetRequiresManager := targetRoleRecord.RequiresManager || targetRoleRecord.Code == "employee"
-	if targetRequiresManager && targetManagerID == nil {
-		targetManagerID = employee.ManagerID
-	}
-
 	if targetRequiresManager && (targetManagerID == nil || *targetManagerID == 0) {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "该角色要求必须选择直属上级",
 		})
 		return
 	}
-	if targetRequiresManager {
-		if validationError := validateManagerAssignment(targetManagerID, targetDepartmentID); validationError != "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationError})
+	targetPosition := updateData.Position
+	if targetPosition == "" {
+		targetPosition = employee.Position
+	}
+	if targetManagerID != nil {
+		if err := managerAssignmentError(models.DB, models.Employee{ID: employee.ID, DepartmentID: targetDepartmentID, Position: targetPosition}, *targetManagerID); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 	}
@@ -398,9 +406,6 @@ func UpdateEmployee(c *gin.Context) {
 		roleValue = LegacyRoleValue(roleValue)
 	}
 	managerValue := updateData.ManagerID
-	if updateData.Role == "" && updateData.ManagerID == nil {
-		managerValue = employee.ManagerID
-	}
 
 	// 使用 map 来确保 nil 值能够被正确更新
 	updateMap := map[string]interface{}{
@@ -435,12 +440,12 @@ func UpdateEmployee(c *gin.Context) {
 		})
 		return
 	}
-	if updateData.Role != "" && LegacyRoleCode(updateData.Role) != LegacyRoleCode(employee.Role) {
-		if err := ReplaceUserRole(tx, employee.ID, updateData.Role); err != nil {
-			tx.Rollback()
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "员工角色更新失败"})
-			return
-		}
+	// Always reconcile both role representations. This also repairs legacy
+	// accounts where employees.role and user_roles drifted apart.
+	if err := SyncEmployeeRole(tx, employee.ID, targetRoleRecord.Code); err != nil {
+		tx.Rollback()
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "员工角色更新失败"})
+		return
 	}
 	if err := tx.Commit().Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "员工更新失败"})
@@ -461,23 +466,6 @@ func UpdateEmployee(c *gin.Context) {
 		"message": "员工更新成功",
 		"data":    employee,
 	})
-}
-
-func validateManagerAssignment(managerID *uint, departmentID uint) string {
-	if managerID == nil || *managerID == 0 {
-		return "普通员工必须选择直属上级"
-	}
-	var manager models.Employee
-	if err := models.DB.Select("id", "department_id", "is_active").First(&manager, *managerID).Error; err != nil {
-		return "直属上级不存在"
-	}
-	if !manager.IsActive {
-		return "直属上级已停用，请选择在职上级"
-	}
-	if manager.DepartmentID != departmentID {
-		return "直属上级不属于所选部门"
-	}
-	return ""
 }
 
 // 删除员工

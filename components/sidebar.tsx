@@ -18,6 +18,9 @@ import {
   Database,
   Scale,
 	ShieldCheck,
+  FileSearch,
+  UserRoundCog,
+  GitBranch,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useEffect, useMemo } from "react"
@@ -79,8 +82,11 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }: SidebarProps)
           { name: "部门管理", href: "/departments", icon: Building, permission: "department:view" },
           { name: "员工管理", href: "/employees", icon: Users, permission: "employee:create" },
 		  { name: "用户角色", href: "/roles", icon: ShieldCheck, permission: "role:view" },
+          { name: "评分职责", href: "/evaluation-responsibilities", icon: UserRoundCog, permission: "responsibility:view" },
           { name: "KPI 模板", href: "/templates", icon: ClipboardList, permission: "kpi:view" },
           { name: "绩效规则", href: "/performance-rules", icon: Scale, permission: "kpi:edit" },
+          { name: "考核审计", href: "/evaluations/audit", icon: FileSearch, permission: "audit:view" },
+          { name: "考核迁移", href: "/evaluations/migration", icon: GitBranch, permission: "system:edit" },
         ],
       },
       {
@@ -108,7 +114,7 @@ export function Sidebar({ isMobileMenuOpen, setIsMobileMenuOpen }: SidebarProps)
 
   useEffect(() => {
     if (!currentUser) return
-    const restrictedRoots = ["/", "/evaluations", "/invitations", "/statistics", "/departments", "/employees", "/roles", "/templates", "/performance-rules", "/backup"]
+    const restrictedRoots = ["/", "/evaluations", "/invitations", "/statistics", "/departments", "/employees", "/roles", "/evaluation-responsibilities", "/templates", "/performance-rules", "/backup"]
     const currentRoot = restrictedRoots.find(root => root === "/" ? pathname === "/" : pathname === root || pathname.startsWith(`${root}/`))
     if (!currentRoot) return
     const allowed = navigation.flatMap(section => section.items).some(item => item.href === currentRoot)

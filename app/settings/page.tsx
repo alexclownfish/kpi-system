@@ -6,23 +6,30 @@ import { Button } from "@/components/ui/button"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Circle, CircleCheck } from "lucide-react"
-import { RefreshCw, CheckCircle, LogOut, Monitor, Sun, Moon, Palette, Shield } from "lucide-react"
+import { RefreshCw, CheckCircle, LogOut, Monitor, Sun, Moon, Palette, Shield, Activity } from "lucide-react"
 import { useAuth } from "@/lib/auth-context"
 import { useAppContext } from "@/lib/app-context"
 import { useTheme } from "@/lib/theme-context"
-import { settingsApi } from "@/lib/api"
+import { auditLogApi, getApiErrorMessage, settingsApi, type AuditLogEntry } from "@/lib/api"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 
-type SettingTab = "appearance" | "system" | "logout"
+type SettingTab = "appearance" | "system" | "diagnostics" | "logout"
 
 export default function SettingsPage() {
-  const { logout, isHR } = useAuth()
+  const { logout, isHR, hasPermission, user } = useAuth()
   const { Confirm } = useAppContext()
   const { theme, setTheme } = useTheme()
   const [allowRegistration, setAllowRegistration] = useState(true)
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<SettingTab>("appearance")
+  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditRefreshToken, setAuditRefreshToken] = useState(0)
+  const [auditResource, setAuditResource] = useState("migration_batch")
+  const [auditError, setAuditError] = useState("")
+  const canViewDiagnostics = user?.data_scope === "ALL" && (hasPermission("audit:view") || hasPermission("system:edit"))
 
   // 初始化设置状态
   useEffect(() => {
@@ -42,6 +49,26 @@ export default function SettingsPage() {
     }
     fetchSettings()
   }, [isHR])
+
+  useEffect(() => {
+    if (activeTab !== "diagnostics" || !canViewDiagnostics) return
+    let cancelled = false
+    const fetchAuditLogs = async () => {
+      try {
+        setAuditLoading(true)
+        setAuditError("")
+        setAuditLogs([])
+        const response = await auditLogApi.list({ resource: auditResource, limit: 100 })
+        if (!cancelled) setAuditLogs(response.data.logs || [])
+      } catch (error) {
+        if (!cancelled) setAuditError(getApiErrorMessage(error, "获取审计诊断失败，请检查权限后重试"))
+      } finally {
+        if (!cancelled) setAuditLoading(false)
+      }
+    }
+    fetchAuditLogs()
+    return () => { cancelled = true }
+  }, [activeTab, canViewDiagnostics, auditRefreshToken, auditResource])
 
   // 保存设置
   const handleSaveSettings = async () => {
@@ -85,6 +112,12 @@ export default function SettingsPage() {
       label: "系统设置",
       icon: <Shield className="w-4 h-4" />,
       available: isHR,
+    },
+    {
+      id: "diagnostics" as SettingTab,
+      label: "审计诊断",
+      icon: <Activity className="w-4 h-4" />,
+      available: canViewDiagnostics,
     },
     {
       id: "logout" as SettingTab,
@@ -247,6 +280,61 @@ export default function SettingsPage() {
     </Card>
   )
 
+  const renderDiagnosticsContent = () => (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <div>
+          <CardTitle className="flex items-center">
+            <Activity className="w-5 h-5 mr-2" />
+            审计诊断
+          </CardTitle>
+          <p className="text-sm text-muted-foreground mt-1">查看迁移、评分职责和考核流程的关键操作记录。</p>
+        </div>
+        <Button variant="outline" onClick={() => setAuditRefreshToken((value) => value + 1)} disabled={auditLoading}>
+          <RefreshCw className={cn("w-4 h-4 mr-2", auditLoading && "animate-spin")} />
+          刷新
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="mb-4">
+          <Select value={auditResource} onValueChange={setAuditResource}>
+            <SelectTrigger className="w-full sm:w-64" aria-label="审计操作类型"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="migration_batch">考核迁移</SelectItem>
+              <SelectItem value="evaluation_responsibility">评分职责</SelectItem>
+              <SelectItem value="evaluation">考核流程与确认</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="mt-2 text-xs text-muted-foreground">显示当前类型最近100条记录。</p>
+        </div>
+        {auditLoading ? (
+          <div className="py-12 text-center text-muted-foreground">正在读取审计记录...</div>
+        ) : auditError ? (
+          <div role="alert" className="py-6 text-destructive">{auditError}，请点击刷新重试。</div>
+        ) : auditLogs.length === 0 ? (
+          <div className="py-12 text-center text-muted-foreground">当前类型暂无操作记录</div>
+        ) : (
+          <div className="space-y-3">
+            {auditLogs.map((entry) => (
+              <div key={entry.id} className="rounded-lg border p-3 space-y-1">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium">{entry.action}</span>
+                  <span className={cn("text-xs", entry.result === "SUCCESS" ? "text-emerald-600" : "text-destructive")}>
+                    {entry.result}
+                  </span>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  {entry.resource} #{entry.resource_id || "-"} · {entry.actor?.name || "系统"} · {new Date(entry.created_at).toLocaleString()}
+                </div>
+                {entry.details && <div className="text-sm break-words">{entry.details}</div>}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+
   // 处理菜单项点击
   const handleMenuClick = (item: typeof menuItems[0]) => {
     if (item.action) {
@@ -297,6 +385,7 @@ export default function SettingsPage() {
         <div className="lg:col-span-3">
           {activeTab === "appearance" && renderAppearanceContent()}
           {activeTab === "system" && isHR && renderSystemContent()}
+          {activeTab === "diagnostics" && canViewDiagnostics && renderDiagnosticsContent()}
           {activeTab === "system" && !isHR && (
             <div className="flex items-center justify-center h-64">
               <div className="text-center">

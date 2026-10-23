@@ -61,6 +61,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case "draft":
+        return <Badge variant="outline">草稿</Badge>
+      case "self_evaluating":
+        return <Badge variant="outline" className="text-yellow-600 border-yellow-600">员工自评</Badge>
+      case "scoring":
+        return <Badge variant="outline" className="text-blue-600 border-blue-600">按模板评分</Badge>
+      case "awaiting_review":
+        return <Badge variant="outline">等待复核</Badge>
+      case "rejected":
+        return <Badge variant="outline" className="text-red-600 border-red-600">已退回</Badge>
+      case "cancelled":
+        return <Badge variant="outline">已取消</Badge>
       case "pending":
         return (
           <Badge variant="outline" className="text-yellow-600 border-yellow-600">
@@ -83,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           </Badge>
         )
       case "pending_confirm":
+      case "awaiting_employee_confirmation":
         return (
           <Badge variant="outline" className="text-pink-600 border-pink-600">
             <Star className="w-3 h-3 mr-1" />

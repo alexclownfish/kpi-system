@@ -22,7 +22,7 @@ func setupPermissionDB(t *testing.T) {
 		t.Fatal(err)
 	}
 	models.DB = db
-	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.UserRole{}, &models.RolePermission{}, &models.DataScope{}, &models.RoleDataScope{}, &models.AuditLog{}, &models.Department{}, &models.Employee{}); err != nil {
+	if err := db.AutoMigrate(&models.Role{}, &models.Permission{}, &models.UserRole{}, &models.RolePermission{}, &models.DataScope{}, &models.RoleDataScope{}, &models.AuditLog{}, &models.Department{}, &models.Employee{}, &models.EvaluationScoringTask{}); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -214,6 +214,9 @@ func TestHRCannotMutateSuperAdmin(t *testing.T) {
 	models.DB.Create(&hrRole)
 	models.DB.Create(&superRole)
 	models.DB.Create(&assignPermission)
+	hrScope := models.DataScope{Code: "ALL"}
+	models.DB.Create(&hrScope)
+	models.DB.Create(&models.RoleDataScope{RoleID: hrRole.ID, DataScopeID: hrScope.ID})
 	models.DB.Create(&models.UserRole{UserID: hr.ID, RoleID: hrRole.ID})
 	models.DB.Create(&models.RolePermission{RoleID: hrRole.ID, PermissionID: assignPermission.ID})
 
@@ -340,5 +343,61 @@ func TestApplyEvaluationScopePreventsCrossEmployeeAccess(t *testing.T) {
 	}
 	if CanAccessEvaluation(owner.ID, otherEvaluation.ID) {
 		t.Fatal("self scope leaked another employee evaluation")
+	}
+}
+
+func TestSyncEmployeeRoleRepairsLegacyRoleDrift(t *testing.T) {
+	setupPermissionDB(t)
+	user := models.Employee{Name: "漂移用户", Email: "drift@test", Role: "employee", IsActive: true}
+	reviewerRole := models.Role{Code: "reviewer", Name: "评审人"}
+	employeeRole := models.Role{Code: "employee", Name: "普通员工"}
+	models.DB.Create(&user)
+	models.DB.Create(&reviewerRole)
+	models.DB.Create(&employeeRole)
+	models.DB.Create(&models.UserRole{UserID: user.ID, RoleID: reviewerRole.ID})
+
+	if err := SyncEmployeeRole(models.DB, user.ID, employeeRole.Code); err != nil {
+		t.Fatal(err)
+	}
+	var refreshed models.Employee
+	if err := models.DB.First(&refreshed, user.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if refreshed.Role != "employee" {
+		t.Fatalf("employee role=%q, want employee", refreshed.Role)
+	}
+	role, err := UserPrimaryRole(models.DB, user.ID)
+	if err != nil || role.Code != employeeRole.Code {
+		t.Fatalf("primary role=%+v err=%v, want employee", role, err)
+	}
+}
+
+func TestSyncEmployeeRoleKeepsEmployeeAndRBACAtomic(t *testing.T) {
+	setupPermissionDB(t)
+	user := models.Employee{Name: "事务用户", Email: "atomic@test", Role: "reviewer", IsActive: true}
+	reviewerRole := models.Role{Code: "reviewer", Name: "评审人"}
+	employeeRole := models.Role{Code: "employee", Name: "普通员工"}
+	models.DB.Create(&user)
+	models.DB.Create(&reviewerRole)
+	models.DB.Create(&employeeRole)
+	models.DB.Create(&models.UserRole{UserID: user.ID, RoleID: reviewerRole.ID})
+
+	err := models.DB.Transaction(func(tx *gorm.DB) error {
+		if err := SyncEmployeeRole(tx, user.ID, employeeRole.Code); err != nil {
+			return err
+		}
+		return gorm.ErrInvalidData
+	})
+	if err == nil {
+		t.Fatal("expected transaction error")
+	}
+	var refreshed models.Employee
+	models.DB.First(&refreshed, user.ID)
+	if refreshed.Role != "reviewer" {
+		t.Fatalf("role changed after rollback: %q", refreshed.Role)
+	}
+	role, roleErr := UserPrimaryRole(models.DB, user.ID)
+	if roleErr != nil || role.Code != reviewerRole.Code {
+		t.Fatalf("binding changed after rollback: %+v err=%v", role, roleErr)
 	}
 }

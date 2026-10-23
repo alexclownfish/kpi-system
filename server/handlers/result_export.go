@@ -29,31 +29,42 @@ const (
 )
 
 var exportColumnLabels = map[string]string{
-	"item_name":        "指标",
-	"item_description": "指标说明",
-	"max_score":        "满分",
-	"self_score":       "自评分",
-	"self_comment":     "自评说明",
-	"manager_score":    "主管评分",
-	"manager_comment":  "主管说明",
-	"hr_score":         "HR评分",
-	"hr_comment":       "HR说明",
-	"final_score":      "最终得分",
-	"final_comment":    "最终评价",
+	"dimension_name":        "维度",
+	"dimension_weight":      "维度权重",
+	"item_name":             "指标",
+	"item_description":      "指标说明",
+	"max_score":             "满分",
+	"item_weight":           "指标权重",
+	"composite_weight":      "综合权重",
+	"scorer_type":           "评分职责",
+	"scorer_name":           "实际评分人",
+	"actual_scorers":        "实际评分人",
+	"weighted_contribution": "加权贡献",
+	"self_score":            "自评分",
+	"self_comment":          "自评说明",
+	"manager_score":         "主管评分",
+	"manager_comment":       "主管说明",
+	"hr_score":              "HR评分",
+	"hr_comment":            "HR说明",
+	"final_score":           "最终得分",
+	"grade":                 "评分等级",
+	"final_comment":         "最终评价",
 }
 
 func defaultExportLayout(preset string) models.ResultExportLayout {
 	if preset == exportPresetFullProcess {
 		return models.ResultExportLayout{
 			Version: 1, Preset: exportPresetFullProcess, Title: "绩效考核结果确认表",
-			Columns:     []string{"item_name", "item_description", "max_score", "self_score", "self_comment", "manager_score", "manager_comment", "hr_score", "hr_comment", "final_score", "final_comment"},
+			Orientation: "portrait",
+			Columns:     []string{"dimension_name", "dimension_weight", "item_name", "item_description", "max_score", "item_weight", "composite_weight", "scorer_type", "scorer_name", "self_score", "self_comment", "manager_score", "manager_comment", "hr_score", "hr_comment", "weighted_contribution", "final_score", "grade", "final_comment"},
 			ShowSummary: true, ShowEmployeeOpinion: true,
 			SignatureLabels: []string{"员工签字", "直属主管签字", "HR签字", "签字日期"},
 		}
 	}
 	return models.ResultExportLayout{
 		Version: 1, Preset: exportPresetFinalSignoff, Title: "绩效考核结果确认表",
-		Columns:     []string{"item_name", "max_score", "final_score", "final_comment"},
+		Orientation: "portrait",
+		Columns:     []string{"item_name", "max_score", "weighted_contribution", "final_score", "grade", "final_comment"},
 		ShowSummary: true, ShowEmployeeOpinion: true,
 		SignatureLabels: []string{"员工签字", "直属主管签字", "HR签字", "签字日期"},
 	}
@@ -69,6 +80,10 @@ func normalizeExportLayout(layout models.ResultExportLayout) models.ResultExport
 		return base
 	}
 	base.Version = 1
+	base.Orientation = strings.ToLower(strings.TrimSpace(layout.Orientation))
+	if base.Orientation != "landscape" {
+		base.Orientation = "portrait"
+	}
 	base.Title = strings.TrimSpace(layout.Title)
 	if base.Title == "" {
 		base.Title = "绩效考核结果确认表"
@@ -90,7 +105,7 @@ func validateExportLayout(layout models.ResultExportLayout) (models.ResultExport
 		return layout, errors.New("标题长度必须为1到60个字符")
 	}
 	if len(layout.Columns) < 2 || len(layout.Columns) > len(exportColumnLabels) {
-		return layout, errors.New("导出列数量必须为2到11个")
+		return layout, fmt.Errorf("导出列数量必须为2到%d个", len(exportColumnLabels))
 	}
 	seen := map[string]bool{}
 	for _, key := range layout.Columns {
@@ -150,7 +165,9 @@ type exportDocument struct {
 	Position            string
 	Period              string
 	TemplateName        string
+	Orientation         string
 	TotalScore          string
+	Grade               string
 	Columns             []string
 	Headers             []string
 	Rows                [][]string
@@ -176,12 +193,28 @@ func finalScoreText(value float64) string {
 
 func itemExportValue(item resultSnapshotItem, key string) string {
 	switch key {
+	case "dimension_name":
+		return item.DimensionName
+	case "dimension_weight":
+		return weightedScoreText(item, item.DimensionWeight)
 	case "item_name":
 		return item.Name
 	case "item_description":
 		return item.Description
 	case "max_score":
 		return finalScoreText(item.MaxScore)
+	case "item_weight":
+		return weightedScoreText(item, item.ItemWeight)
+	case "composite_weight":
+		return weightedScoreText(item, item.CompositeWeight)
+	case "scorer_type":
+		return item.ScorerType
+	case "scorer_name":
+		return item.ScorerName
+	case "actual_scorers":
+		return item.ScorerName
+	case "weighted_contribution":
+		return weightedScoreText(item, item.WeightedContribution)
 	case "self_score":
 		return scoreText(item.SelfScore)
 	case "self_comment":
@@ -196,6 +229,11 @@ func itemExportValue(item resultSnapshotItem, key string) string {
 		return item.HRComment
 	case "final_score":
 		return finalScoreText(item.FinalScore)
+	case "grade":
+		// The grade is an assessment-level value. buildExportDocument fills it
+		// from the canonical result for each detail row when this column is
+		// selected, keeping Excel and PDF column parity.
+		return ""
 	case "final_comment":
 		return item.FinalComment
 	default:
@@ -203,12 +241,23 @@ func itemExportValue(item resultSnapshotItem, key string) string {
 	}
 }
 
+func weightedScoreText(item resultSnapshotItem, value float64) string {
+	if !item.HasWeightedFields {
+		return ""
+	}
+	return finalScoreText(value)
+}
+
 func buildExportDocument(snapshot models.EvaluationResultSnapshot, payload resultSnapshotPayload) exportDocument {
 	layout := normalizeExportLayout(payload.ExportLayout)
+	grade := strings.TrimSpace(payload.Grade)
+	if grade == "" {
+		grade = GradeForScore(payload.TotalScore)
+	}
 	doc := exportDocument{
 		Title: layout.Title, EmployeeName: payload.EmployeeName, Department: payload.Department,
 		Position: payload.Position, Period: formatPeriodDisplay(payload.Period, payload.Year, payload.Month, payload.Quarter),
-		TemplateName: payload.TemplateName, TotalScore: finalScoreText(payload.TotalScore),
+		TemplateName: payload.TemplateName, Orientation: layout.Orientation, TotalScore: finalScoreText(payload.TotalScore), Grade: grade,
 		Columns: append([]string(nil), layout.Columns...), ShowSummary: layout.ShowSummary,
 		Summary: payload.FinalComment, ShowEmployeeOpinion: layout.ShowEmployeeOpinion,
 		SignatureLabels: append([]string(nil), layout.SignatureLabels...),
@@ -220,7 +269,11 @@ func buildExportDocument(snapshot models.EvaluationResultSnapshot, payload resul
 	for _, item := range payload.Items {
 		row := make([]string, 0, len(doc.Columns))
 		for _, key := range doc.Columns {
-			row = append(row, itemExportValue(item, key))
+			value := itemExportValue(item, key)
+			if key == "grade" {
+				value = doc.Grade
+			}
+			row = append(row, value)
 		}
 		doc.Rows = append(doc.Rows, row)
 	}
@@ -237,7 +290,7 @@ func renderResultExcel(doc exportDocument, path string) error {
 	f.MergeCell(sheet, "A1", lastCol+"1")
 	titleStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 16}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
 	f.SetCellStyle(sheet, "A1", lastCol+"1", titleStyle)
-	meta := [][]string{{"员工", doc.EmployeeName, "部门", doc.Department}, {"岗位", doc.Position, "周期", doc.Period}, {"模板", doc.TemplateName, "总分", doc.TotalScore}, {"结果版本", fmt.Sprintf("V%d", doc.Version), "校验码", shortChecksum(doc.Checksum)}}
+	meta := [][]string{{"员工", doc.EmployeeName, "部门", doc.Department}, {"岗位", doc.Position, "周期", doc.Period}, {"模板", doc.TemplateName, "总分", doc.TotalScore}, {"评分等级", doc.Grade, "结果版本", fmt.Sprintf("V%d", doc.Version)}, {"校验码", shortChecksum(doc.Checksum), "考核编号", doc.EvaluationCode}}
 	row := 3
 	for _, values := range meta {
 		for index, value := range values {
@@ -302,10 +355,9 @@ func renderResultExcel(doc exportDocument, path string) error {
 		}
 		f.SetColWidth(sheet, col, col, width)
 	}
-	landscape := len(doc.Headers) > 6
-	orientation := "portrait"
-	if landscape {
-		orientation = "landscape"
+	orientation := doc.Orientation
+	if orientation != "landscape" {
+		orientation = "portrait"
 	}
 	fitWidth, fitHeight, paperSize, fitToPage := 1, 0, 9, true
 	_ = f.SetSheetProps(sheet, &excelize.SheetPropsOptions{FitToPage: &fitToPage})
@@ -335,7 +387,7 @@ func maxInt(a, b int) int {
 
 const resultPDFHTML = `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>
 @page{size:A4 portrait;margin:10mm}body{font-family:"Noto Sans CJK SC","Microsoft YaHei",sans-serif;color:#111;font-size:9px;line-height:1.35;margin:0}h1{text-align:center;font-size:18px;margin:0 0 10px}.meta,.scores{width:100%;border-collapse:collapse;table-layout:fixed}.meta{margin-bottom:9px}.meta td,.scores th,.scores td{border:1px solid #333;padding:3px 4px;vertical-align:top;word-break:break-all;overflow-wrap:anywhere}.meta td{width:50%}.scores th{background:#eee;font-size:8px;line-height:1.2}.scores td{font-size:8px}.scores thead{display:table-header-group}.summary,.opinion{border:1px solid #333;min-height:42px;padding:6px;margin-top:8px;word-break:break-all;overflow-wrap:anywhere}.signatures{margin-top:18px;display:grid;grid-template-columns:1fr 1fr;gap:18px 24px;font-size:9px}.foot{margin-top:16px;font-size:7px;word-break:break-all;color:#555}tr{break-inside:avoid}</style></head><body>
-<h1>{{.Title}}</h1><table class="meta"><tr><td>员工：{{.EmployeeName}}</td><td>部门：{{.Department}}</td></tr><tr><td>岗位：{{.Position}}</td><td>周期：{{.Period}}</td></tr><tr><td>模板：{{.TemplateName}}</td><td>总分：{{.TotalScore}}</td></tr></table>
+<h1>{{.Title}}</h1><table class="meta"><tr><td>员工：{{.EmployeeName}}</td><td>部门：{{.Department}}</td></tr><tr><td>岗位：{{.Position}}</td><td>周期：{{.Period}}</td></tr><tr><td>模板：{{.TemplateName}}</td><td>总分：{{.TotalScore}}</td></tr><tr><td>评分等级：{{.Grade}}</td><td>结果版本：V{{.Version}}</td></tr></table>
 <table class="scores"><thead><tr>{{range .Headers}}<th>{{.}}</th>{{end}}</tr></thead><tbody>{{range .Rows}}<tr>{{range .}}<td>{{.}}</td>{{end}}</tr>{{end}}</tbody></table>
 {{if .ShowSummary}}<div class="summary"><strong>总结评价：</strong><br>{{.Summary}}</div>{{end}}{{if .ShowEmployeeOpinion}}<div class="opinion"><strong>员工确认意见：</strong></div>{{end}}<div class="signatures">{{range .SignatureLabels}}<div>{{.}}：{{if eq . "签字日期"}}______年____月____日{{else}}________________{{end}}</div>{{end}}</div>
 <div class="foot">考核编号：{{.EvaluationCode}}　结果版本：V{{.Version}}<br>校验码：{{.Checksum}}</div></body></html>`
@@ -384,6 +436,18 @@ func resultPDFPaths(path string) (string, string, string, error) {
 
 var renderResultPDFFile = renderResultPDF
 
+// chromiumBinary resolves the browser used by both single and batch PDF
+// exports. Keeping this lookup beside the shared renderer prevents the batch
+// path from drifting to a separate PDF implementation.
+func chromiumBinary() (string, error) {
+	for _, name := range []string{"chromium", "chromium-browser", "google-chrome"} {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", errors.New("未找到 Chromium，请重新构建后端镜像")
+}
+
 func normalizeExportFormat(value string) (string, error) {
 	format := strings.ToLower(strings.TrimSpace(value))
 	if format == "" {
@@ -409,32 +473,32 @@ func parseSnapshotPayload(snapshot models.EvaluationResultSnapshot) (resultSnaps
 func ExportEvaluationToExcel(c *gin.Context) {
 	evaluationID, err := strconv.ParseUint(c.Param("id"), 10, 32)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "无效的评估ID"})
+		respondExportError(c, http.StatusBadRequest, "INVALID_EVALUATION_ID", "无效的评估ID", false, "请刷新页面后选择有效的考核再导出", nil)
 		return
 	}
 	format, err := normalizeExportFormat(c.Query("format"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		respondExportError(c, http.StatusBadRequest, "INVALID_EXPORT_FORMAT", err.Error(), false, "请选择 Excel 或 PDF 格式后重试", nil)
 		return
 	}
 	var evaluation models.KPIEvaluation
 	result := ApplyEvaluationScope(models.DB.Preload("Employee.Department").Preload("Template").Preload("Scores.Item"), c.GetUint("user_id")).First(&evaluation, evaluationID)
 	if result.Error != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": "评估不存在或超出数据范围"})
+		respondExportError(c, http.StatusForbidden, "EXPORT_SCOPE_FORBIDDEN", "评估不存在或超出数据范围", false, "请确认你有权查看该考核", nil)
 		return
 	}
-	if evaluation.Status != "pending_confirm" && evaluation.Status != "completed" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "最终结果尚未定稿，暂不能导出签字表"})
+	if !canConfirmEvaluationState(evaluation.Status) && evaluation.Status != "completed" {
+		respondExportError(c, http.StatusConflict, "EXPORT_RESULT_NOT_FINAL", "最终结果尚未定稿，暂不能导出签字表", false, "请完成必填评分并推进到员工确认阶段后再导出", nil)
 		return
 	}
 	snapshot, payload, err := GetOrCreateResultSnapshot(models.DB, evaluation.ID, c.GetUint("user_id"))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成结果版本失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_RESULT_SNAPSHOT_FAILED", "生成结果版本失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", nil)
 		return
 	}
 	doc := buildExportDocument(snapshot, payload)
 	if err := os.MkdirAll(ExportDir, 0755); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建导出目录失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_DIRECTORY_FAILED", "创建导出目录失败", true, "请稍后重试；若仍失败，请检查服务存储空间并提供 request_id", &snapshot.Version)
 		return
 	}
 	base := fmt.Sprintf("绩效结果-%s-%s-%d", safeFileName(payload.EmployeeName), safeFileName(doc.Period), time.Now().Unix())
@@ -446,19 +510,19 @@ func ExportEvaluationToExcel(c *gin.Context) {
 		err = renderResultExcel(doc, filePath)
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "生成导出文件失败", "message": err.Error()})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_RENDER_FAILED", "生成导出文件失败", true, "请稍后重试；若连续失败，请提供 request_id 和结果版本给管理员", &snapshot.Version)
 		return
 	}
 	info, err := os.Stat(filePath)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取导出文件失败"})
+		respondExportError(c, http.StatusInternalServerError, "EXPORT_FILE_STAT_FAILED", "获取导出文件失败", true, "请稍后重试；若仍失败，请提供 request_id 给管理员", &snapshot.Version)
 		return
 	}
 	randomKey := "export_" + uuid.NewString()
 	global.Cache.Set(randomKey, fileName, 5*time.Minute)
 	downloadURL := utils.GetFileURL(c.GetString("base_url"), fmt.Sprintf("/api/download/exports/%s", randomKey))
 	RecordAuditDetails(c, "export_evaluation_result", "evaluation", strconv.FormatUint(uint64(evaluation.ID), 10), "SUCCESS", "format="+format)
-	c.JSON(http.StatusOK, ExportResponse{FileURL: downloadURL, FileName: fileName, FileSize: info.Size(), Message: "导出成功", ResultVersion: snapshot.Version, Checksum: snapshot.Checksum})
+	c.JSON(http.StatusOK, ExportResponse{FileURL: downloadURL, FileName: fileName, FileSize: info.Size(), Message: "导出成功", RequestID: requestID(c), ResultVersion: snapshot.Version, Checksum: snapshot.Checksum})
 	go func() {
 		time.Sleep(30 * time.Minute)
 		_ = os.Remove(filePath)

@@ -10,14 +10,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Plus, Edit, Trash2, Users, Search } from "lucide-react"
-import { accessControlApi, employeeApi, departmentApi, type Employee, type EmployeeUpdateRequest, type Department, type PaginatedResponse, type Role } from "@/lib/api"
+import { accessControlApi, employeeApi, departmentApi, getApiErrorMessage, type Employee, type EmployeeUpdateRequest, type Department, type PaginatedResponse, type Role } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { useAuth } from "@/lib/auth-context"
 import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { getRoleLabel, normalizeRoleCode } from "@/lib/access-control"
-import axios from "axios"
 
 export default function EmployeesPage() {
   const { Alert, Confirm } = useAppContext()
@@ -29,8 +28,10 @@ export default function EmployeesPage() {
   const canManageSystemRoles = hasPermission("role:edit")
   const [employees, setEmployees] = useState<Employee[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
+  const [positions, setPositions] = useState<string[]>([])
+  const [positionError, setPositionError] = useState("")
   const [managers, setManagers] = useState<Employee[]>([])
-  const [supervisors, setSupervisors] = useState<Employee[]>([])
+  const [managerError, setManagerError] = useState("")
   const [roles, setRoles] = useState<Role[]>([])
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -77,8 +78,7 @@ export default function EmployeesPage() {
   // 获取部门列表
   const fetchDepartments = useCallback(async () => {
     try {
-      const response = await departmentApi.getAll()
-      setDepartments(response.data || [])
+      setDepartments(await departmentApi.getCatalog())
     } catch (error) {
       console.error("获取部门列表失败:", error)
     }
@@ -91,6 +91,18 @@ export default function EmployeesPage() {
   useEffect(() => {
     if (canCreate || canEdit) fetchDepartments()
   }, [canCreate, canEdit, fetchDepartments])
+
+  useEffect(() => {
+    let active = true
+    setPositions([])
+    setPositionError("")
+    if (formData.department_id && (canCreate || canEdit)) {
+      departmentApi.getPositions(Number(formData.department_id))
+        .then(response => { if (active) setPositions(response.data.map(position => position.name)) })
+        .catch(() => { if (active) setPositionError("岗位目录加载失败，请重新选择部门重试。") })
+    }
+    return () => { active = false }
+  }, [formData.department_id, canCreate, canEdit])
 
   useEffect(() => {
     if (!canAssignRole) return
@@ -109,65 +121,24 @@ export default function EmployeesPage() {
   )
 
   // 获取某个部门的上级员工
-  const fetchDepartmentManagers = useCallback(async (departmentId: string) => {
-    try {
-      const response = await employeeApi.getAll({
-        department_id: departmentId,
-        pageSize: 100, // 获取该部门所有上级
-		is_active: true,
-      })
-      const departmentManagers = response.data || []
-      // 如果是编辑模式，排除当前编辑的员工
-      const filteredManagers = editingEmployee 
-        ? departmentManagers.filter(emp => emp.id !== editingEmployee.id)
-        : departmentManagers
-      setManagers(filteredManagers)
-    } catch (error) {
-      console.error("获取部门上级失败:", error)
-      setManagers([])
-    }
-  }, [editingEmployee])
-
-  // 当选择部门时获取该部门的上级
   useEffect(() => {
+    let active = true
+    setManagers([])
+    setManagerError("")
     if (formData.department_id) {
-      fetchDepartmentManagers(formData.department_id)
-    } else {
-      setManagers([])
+      departmentApi.getManagerCandidates(Number(formData.department_id), formData.position, editingEmployee?.id)
+        .then(response => { if (active) { setManagers(response.data || []); setManagerError(response.message || "") } })
+        .catch(error => { if (active) setManagerError(getApiErrorMessage(error, "上级候选加载失败")) })
     }
-  }, [formData.department_id, fetchDepartmentManagers])
-
-  // 获取可为主管设置的所有上级候选
-  const fetchSupervisors = useCallback(async () => {
-    try {
-      const response = await employeeApi.getAll({
-        pageSize: 100,
-        is_active: true,
-      })
-      setSupervisors(response.data || [])
-    } catch (error) {
-      console.error("获取可选上级失败:", error)
-      setSupervisors([])
-    }
-  }, [])
+    return () => { active = false }
+  }, [formData.department_id, formData.position, editingEmployee?.id])
 
   const selectedRoleRequiresManager = useMemo(() => {
     const role = roles.find(item => item.code === normalizeRoleCode(formData.role))
     return role?.requires_manager ?? normalizeRoleCode(formData.role) === "employee"
   }, [formData.role, roles])
 
-  useEffect(() => {
-    if (!selectedRoleRequiresManager && supervisors.length === 0) {
-      fetchSupervisors()
-    }
-  }, [selectedRoleRequiresManager, supervisors.length, fetchSupervisors])
-
-  const supervisorOptions = useMemo(() => {
-    if (!selectedRoleRequiresManager) {
-      return supervisors.filter(emp => (editingEmployee ? emp.id !== editingEmployee.id : true))
-    }
-    return managers
-  }, [selectedRoleRequiresManager, supervisors, managers, editingEmployee])
+  const supervisorOptions = managers
 
   const managerSelectValue = useMemo(() => {
     if (!selectedRoleRequiresManager) {
@@ -241,12 +212,7 @@ export default function EmployeesPage() {
       await Alert(editingEmployee ? "更新成功" : "创建成功", editingEmployee ? "员工信息已更新。" : "新员工已创建，可使用初始密码登录。")
     } catch (error) {
       console.error("保存员工失败:", error)
-      const message = axios.isAxiosError(error)
-        ? error.response?.data?.error || error.response?.data?.message || error.message
-        : error instanceof Error
-          ? error.message
-          : "未知错误"
-      await Alert("保存失败", message)
+      await Alert("保存失败", getApiErrorMessage(error, "保存员工失败"))
     } finally {
       setSubmitting(false)
     }
@@ -338,13 +304,18 @@ export default function EmployeesPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-2">
-                  <Label htmlFor="position">职位</Label>
+                  <Label htmlFor="position">岗位</Label>
                   <Input
                     id="position"
+                    list="department-position-options"
                     value={formData.position}
                     onChange={e => setFormData({ ...formData, position: e.target.value })}
                     required
                   />
+                  <datalist id="department-position-options">
+                    {positions.map(position => <option key={position} value={position} />)}
+                  </datalist>
+                  {positionError && <p role="alert" className="text-sm text-red-600">{positionError}</p>}
                 </div>
                 {(!editingEmployee || canEdit) && (
                   <>
@@ -420,18 +391,20 @@ export default function EmployeesPage() {
                     直属上级
                     {selectedRoleRequiresManager
                       ? "（必选）"
-                      : "（可选，可指定任一员工或无上级）"}
+                      : "（可选）"}
                   </Label>
+                  {managerError && <p role="alert" className="text-sm text-destructive">{managerError}</p>}
                   <Select
                     value={managerSelectValue}
                     onValueChange={value => setFormData({ ...formData, manager_id: value === "none" ? "" : value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full min-w-0">
                       <SelectValue
+                        className="min-w-0 flex-1 text-left [&>div]:min-w-0 [&>div]:truncate"
                         placeholder={
                           selectedRoleRequiresManager
                             ? "选择直属上级（必选）"
-                            : "选择任一员工作为上级或无上级"
+                            : "选择直属上级或无上级"
                         }
                       />
                     </SelectTrigger>
@@ -443,14 +416,14 @@ export default function EmployeesPage() {
                       )}
                       {supervisorOptions.length === 0 && (
                         <SelectItem value="none-disabled" disabled>
-                          {selectedRoleRequiresManager ? "暂无可选上级" : "暂无可选员工"}
+                          暂无可选上级
                         </SelectItem>
                       )}
                       {supervisorOptions.map(manager => {
                         const departmentText = manager.department?.name ? `（${manager.department.name}）` : ""
                         const roleText = ` - ${getRoleLabel(manager.role)}`
                         return (
-                          <SelectItem key={manager.id} value={manager.id.toString()}>
+                          <SelectItem key={manager.id} value={manager.id.toString()} className="whitespace-normal break-words">
                             {manager.name}
                             {departmentText}
                             {roleText}

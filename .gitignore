@@ -41,6 +41,7 @@ yarn-error.log*
 
 # local deployment secrets
 /secrets/
+/pg-admin-secrets/
 
 # vercel
 .vercel
@@ -52,6 +53,8 @@ next-env.d.ts
 # local extraction artifacts
 /kpi-main/
 /kpi-main.zip
+__pycache__/
+*.pyc
 
 # nginx runtime logs
 /nginx/logs/

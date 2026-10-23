@@ -39,6 +39,9 @@ func GetEvaluationComments(c *gin.Context) {
 
 	// 转换用户ID类型
 	userID := currentUserID.(uint)
+	if !authorizeCommentEvaluation(c, evaluationID, 0) {
+		return
+	}
 
 	// 如果不是管理员，只显示公开评论和自己的私有评论
 	// 这里简化处理，假设所有用户都可以看到公开评论
@@ -87,6 +90,9 @@ func CreateEvaluationComment(c *gin.Context) {
 		return
 	}
 	userID := currentUserID.(uint)
+	if !authorizeCommentEvaluation(c, evaluationID, 0) {
+		return
+	}
 
 	var req struct {
 		Content   string `json:"content" binding:"required"`
@@ -158,6 +164,9 @@ func UpdateEvaluationComment(c *gin.Context) {
 	}
 
 	// 检查权限：只有评论作者可以编辑
+	if !authorizeCommentEvaluation(c, c.Param("id"), comment.EvaluationID) {
+		return
+	}
 	if comment.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权限编辑此评论"})
 		return
@@ -201,6 +210,9 @@ func DeleteEvaluationComment(c *gin.Context) {
 	}
 
 	// 检查权限：只有评论作者可以删除
+	if !authorizeCommentEvaluation(c, c.Param("id"), comment.EvaluationID) {
+		return
+	}
 	if comment.UserID != userID {
 		c.JSON(http.StatusForbidden, gin.H{"error": "无权限删除此评论"})
 		return
@@ -215,4 +227,21 @@ func DeleteEvaluationComment(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "评论删除成功",
 	})
+}
+
+func authorizeCommentEvaluation(c *gin.Context, rawID string, commentEvaluationID uint) bool {
+	evaluationID, err := strconv.ParseUint(rawID, 10, 32)
+	if err != nil || evaluationID == 0 {
+		respondError(c, http.StatusBadRequest, "INVALID_EVALUATION_ID", "考核ID无效", nil)
+		return false
+	}
+	if commentEvaluationID != 0 && commentEvaluationID != uint(evaluationID) {
+		respondError(c, http.StatusNotFound, "COMMENT_NOT_FOUND", "评论不属于该考核", nil)
+		return false
+	}
+	if !canViewWorkflowEvaluation(models.DB, c.GetUint("user_id"), uint(evaluationID)) {
+		respondError(c, http.StatusForbidden, "ASSESSMENT_SCOPE_FORBIDDEN", "无权访问该考核评论", nil)
+		return false
+	}
+	return true
 }

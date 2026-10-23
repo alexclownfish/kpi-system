@@ -47,6 +47,12 @@ type BackupHistoryResponse struct {
 
 // 创建数据库备份 (SQL格式)
 func CreateBackup(c *gin.Context) {
+	if models.DB != nil && models.DB.Dialector.Name() == "postgres" {
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error": "PostgreSQL 全量备份请使用部署文档中的 pg_dump 维护流程；旧页面 SQL 备份仅适用于 SQLite",
+		})
+		return
+	}
 	// 创建备份目录
 	if err := os.MkdirAll(BackupDir, 0755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -224,6 +230,12 @@ func DownloadBackup(c *gin.Context) {
 
 // 恢复数据库
 func RestoreBackup(c *gin.Context) {
+	if models.DB != nil && models.DB.Dialector.Name() == "postgres" {
+		c.JSON(http.StatusNotImplemented, gin.H{
+			"error": "PostgreSQL 恢复必须在维护窗口使用部署文档中的 pg_restore 流程；不能使用 SQLite 页面备份恢复",
+		})
+		return
+	}
 	fileName := c.Param("filename")
 
 	// 验证文件名格式，支持.db和.sql文件恢复

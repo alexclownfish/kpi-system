@@ -83,7 +83,7 @@ func GetRoles(c *gin.Context) {
 	query := models.DB.Model(&models.Role{})
 	if search := strings.TrimSpace(c.Query("search")); search != "" {
 		pattern := "%" + search + "%"
-		query = query.Where("name LIKE ? OR code LIKE ?", pattern, pattern)
+		query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(code) LIKE LOWER(?)", pattern, pattern)
 	}
 	switch c.Query("type") {
 	case "system":
@@ -143,7 +143,7 @@ func GetPermissions(c *gin.Context) {
 
 func GetDataScopes(c *gin.Context) {
 	var scopes []models.DataScope
-	if err := models.DB.Where("code IN ?", []string{"SELF", "DIRECT_SUBORDINATES", "DEPARTMENT", "ASSIGNED", "ALL"}).Order("id").Find(&scopes).Error; err != nil {
+	if err := models.DB.Where("code IN ?", []string{"SELF", "DIRECT_SUBORDINATES", "DEPARTMENT", "DEPARTMENT_TREE", "ASSIGNED", "ALL"}).Order("id").Find(&scopes).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取数据范围失败"})
 		return
 	}
@@ -240,13 +240,29 @@ func UpdateRole(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "角色不存在"})
 		return
 	}
-	if role.IsSystem {
-		c.JSON(http.StatusForbidden, gin.H{"error": "系统角色不可编辑，请复制后修改"})
+	if role.Code == "super_admin" {
+		RecordAuditDetails(c, "update_role", "role", strconv.Itoa(int(role.ID)), "DENIED", "超级管理员权限受保护，不可编辑")
+		c.JSON(http.StatusForbidden, gin.H{"error": "超级管理员权限受保护，不可编辑"})
+		return
+	}
+	var existingPermissionIDs []uint
+	if err := models.DB.Model(&models.RolePermission{}).Where("role_id = ?", role.ID).Pluck("permission_id", &existingPermissionIDs).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取角色权限失败"})
+		return
+	}
+	if _, err := ValidateGrantableRole(models.DB, actorID(c), existingPermissionIDs, RoleScopeCode(models.DB, role.ID)); err != nil {
+		RecordAuditDetails(c, "update_role", "role", strconv.Itoa(int(role.ID)), "DENIED", err.Error())
+		c.JSON(http.StatusForbidden, gin.H{"error": "无权修改权限或数据范围超过自身的角色"})
 		return
 	}
 	var request RoleMutationRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请求参数错误"})
+		return
+	}
+	if role.IsSystem && (strings.TrimSpace(request.Name) != role.Name || request.RequiresManager != role.RequiresManager) {
+		RecordAuditDetails(c, "update_role", "role", strconv.Itoa(int(role.ID)), "DENIED", "系统角色名称和直属上级要求不可修改")
+		c.JSON(http.StatusBadRequest, gin.H{"error": "系统角色名称和直属上级要求不可修改；可修改权限、数据范围和说明"})
 		return
 	}
 	request, permissions, scope, err := validateRoleRequest(models.DB, c, request, role.ID)
@@ -256,7 +272,7 @@ func UpdateRole(c *gin.Context) {
 		return
 	}
 	err = models.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Model(&role).Updates(map[string]any{"name": request.Name, "description": request.Description, "requires_manager": request.RequiresManager}).Error; err != nil {
+		if err := tx.Model(&role).Updates(map[string]any{"name": request.Name, "description": request.Description, "requires_manager": request.RequiresManager, "access_customized": true}).Error; err != nil {
 			return err
 		}
 		return replaceRoleAccess(tx, role.ID, permissions, scope)
@@ -366,7 +382,7 @@ func GetRoleUsers(c *gin.Context) {
 	query := ApplyEmployeeScope(models.DB.Model(&models.Employee{}).Preload("Department").Preload("Manager"), actorID(c)).Joins("JOIN user_roles ur ON ur.user_id = employees.id").Where("ur.role_id = ?", roleID)
 	if search := strings.TrimSpace(c.Query("search")); search != "" {
 		pattern := "%" + search + "%"
-		query = query.Where("employees.name LIKE ? OR employees.email LIKE ?", pattern, pattern)
+		query = query.Where("LOWER(employees.name) LIKE LOWER(?) OR LOWER(employees.email) LIKE LOWER(?)", pattern, pattern)
 	}
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -433,10 +449,7 @@ func AssignRoleUsers(c *gin.Context) {
 			if err := validateRoleAssignment(tx, c, employee, role); err != nil {
 				return err
 			}
-			if err := ReplaceUserRole(tx, employee.ID, role.Code); err != nil {
-				return err
-			}
-			if err := tx.Model(&models.Employee{}).Where("id = ?", employee.ID).Update("role", LegacyRoleValue(role.Code)).Error; err != nil {
+			if err := SyncEmployeeRole(tx, employee.ID, role.Code); err != nil {
 				return err
 			}
 		}
@@ -476,10 +489,7 @@ func AssignEmployeeRole(c *gin.Context) {
 		return
 	}
 	err = models.DB.Transaction(func(tx *gorm.DB) error {
-		if err := ReplaceUserRole(tx, uint(userID), role.Code); err != nil {
-			return err
-		}
-		return tx.Model(&models.Employee{}).Where("id = ?", userID).Update("role", LegacyRoleValue(role.Code)).Error
+		return SyncEmployeeRole(tx, uint(userID), role.Code)
 	})
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "角色更新失败"})

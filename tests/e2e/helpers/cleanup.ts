@@ -30,6 +30,11 @@ export class CleanupRegistry {
     }
   }
 
+  /** Register only exact IDs; never use a prefix or bulk delete in E2E cleanup. */
+  registerEmployee(id: number, label: string, dependsOn: number[] = []): void {
+    this.register({ resource: "employee", id, label, dependsOn, cleanupOrder: dependsOn.length })
+  }
+
   private async writeStatus(status: "complete" | "failed"): Promise<void> {
     const artifactDir = path.resolve(".artifacts")
     await mkdir(artifactDir, { recursive: true })

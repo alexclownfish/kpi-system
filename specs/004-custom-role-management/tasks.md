@@ -143,3 +143,10 @@
 ## Phase 9: Convergence
 
 - [X] T040 实现仅在显式配置 `BOOTSTRAP_SUPER_ADMIN_EMAIL` 且系统没有有效超级管理员时才执行的一次性超级管理员初始化，并记录审计与启动日志 `server/models/database.go`、`docker-compose.yml`、`specs/004-custom-role-management/quickstart.md`（partial，FR-011）
+
+## Phase 10: Convergence
+
+- [X] T041 在 `server/handlers/permissions.go` 增加统一的员工角色同步服务，保证 `employees.role` 与 `user_roles` 在同一事务中始终对应一个主角色（FR-008，partial）
+- [X] T042 在 `server/handlers/employee.go`、`server/handlers/role.go` 接入统一角色同步服务，即使历史角色字段与绑定表不一致也能在角色分配/员工更新时修复，并保持超级管理员保护与授权上限校验（SC-002，partial）
+- [X] T043 在 `server/handlers/permissions_test.go` 增加历史漂移修复及事务回滚回归测试（FR-008，SC-002，missing）
+- [ ] T044 完成 Alex4 本地数据修复和重新登录验收，确认 `assessment:view`、`SELF` 数据范围及被考核人考核列表可用，并在 quickstart 记录“被考核员工/评审邀请”差异（US3/AC1，partial）

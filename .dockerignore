@@ -8,6 +8,9 @@ coverage/
 *.log*
 .env*
 secrets/
+pg-admin-secrets/
 kpi-main/
 server/uploads/
 uploads/
+__pycache__/
+*.pyc

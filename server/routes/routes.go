@@ -72,11 +72,23 @@ func SetupRoutes(r *gin.RouterGroup) {
 		protected.PUT("/roles/:id/users", handlers.PermissionMiddleware("employee:assign_role"), handlers.AssignRoleUsers)
 		protected.GET("/permissions", handlers.PermissionMiddleware("role:view"), handlers.GetPermissions)
 		protected.GET("/data-scopes", handlers.PermissionMiddleware("role:view"), handlers.GetDataScopes)
+		protected.GET("/audit-logs", handlers.PermissionAnyMiddleware("audit:view", "system:edit"), handlers.GetAuditLogs)
+
+		// 来源工作簿验证、诊断和导入（HR/模板管理员）
+		sourceWorkbookRoutes := protected.Group("/source-workbooks")
+		{
+			sourceWorkbookRoutes.POST("/validate", handlers.PermissionAnyMiddleware("kpi:view", "system:edit"), handlers.ValidateSourceWorkbook)
+			sourceWorkbookRoutes.GET("/:id/diagnostics", handlers.PermissionAnyMiddleware("kpi:view", "system:edit"), handlers.GetSourceWorkbookDiagnostics)
+			sourceWorkbookRoutes.GET("/:id/hr-diagnostics", handlers.PermissionAnyMiddleware("kpi:view", "system:edit"), handlers.GetSourceWorkbookHRDiagnostics)
+			sourceWorkbookRoutes.POST("/:id/import", handlers.PermissionAnyMiddleware("kpi:edit", "system:edit"), handlers.ImportSourceWorkbook)
+		}
 
 		// 部门管理（HR和管理员）
 		departmentRoutes := protected.Group("/departments")
 		{
 			departmentRoutes.GET("", handlers.PermissionMiddleware("department:view"), handlers.GetDepartments)
+			departmentRoutes.GET("/:id/positions", handlers.PermissionAnyMiddleware("department:view", "employee:create", "employee:edit"), handlers.GetDepartmentPositions)
+			departmentRoutes.GET("/:id/manager-candidates", handlers.PermissionAnyMiddleware("department:view", "employee:create", "employee:edit"), handlers.GetDepartmentManagerCandidates)
 			departmentRoutes.POST("", handlers.PermissionMiddleware("department:create"), handlers.CreateDepartment)
 			departmentRoutes.GET("/:id", handlers.GetDepartment)
 			departmentRoutes.PUT("/:id", handlers.PermissionMiddleware("department:edit"), handlers.UpdateDepartment)
@@ -99,11 +111,16 @@ func SetupRoutes(r *gin.RouterGroup) {
 		templateRoutes := protected.Group("/templates")
 		{
 			templateRoutes.GET("", handlers.PermissionMiddleware("kpi:view"), handlers.GetTemplates)
+			templateRoutes.GET("/match-preview", handlers.PermissionMiddleware("kpi:view"), handlers.PreviewEvaluationTemplate)
 			templateRoutes.POST("", handlers.PermissionMiddleware("kpi:create"), handlers.CreateTemplate)
 			templateRoutes.GET("/:id", handlers.PermissionMiddleware("kpi:view"), handlers.GetTemplate)
 			templateRoutes.PUT("/:id", handlers.PermissionMiddleware("kpi:edit"), handlers.UpdateTemplate)
+			templateRoutes.PUT("/:id/calculation-structure", handlers.PermissionMiddleware("kpi:edit"), handlers.SaveTemplateCalculationStructure)
+			templateRoutes.POST("/:id/publish", handlers.PermissionMiddleware("kpi:publish"), handlers.PublishTemplate)
+			templateRoutes.POST("/:id/retire", handlers.PermissionMiddleware("kpi:disable"), handlers.RetireTemplate)
+			templateRoutes.POST("/:id/clone", handlers.PermissionMiddleware("kpi:create"), handlers.CloneTemplate)
 			templateRoutes.DELETE("/:id", handlers.PermissionMiddleware("kpi:delete"), handlers.DeleteTemplate)
-			templateRoutes.GET("/:id/items", handlers.GetTemplateItems)
+			templateRoutes.GET("/:id/items", handlers.PermissionMiddleware("kpi:view"), handlers.GetTemplateItems)
 		}
 
 		// 绩效规则管理（仅HR）
@@ -123,11 +140,41 @@ func SetupRoutes(r *gin.RouterGroup) {
 		}
 
 		// KPI评估管理
+		assessmentAuditRoutes := protected.Group("/assessment-audits")
+		{
+			assessmentAuditRoutes.POST("/preview", handlers.PermissionAnyMiddleware("audit:view", "system:edit"), handlers.PreviewAssessmentAudit)
+			assessmentAuditRoutes.POST("/cleanup-orphan-tasks", handlers.PermissionMiddleware("system:edit"), handlers.CleanupOrphanScoringTasks)
+		}
+
+		migrationRoutes := protected.Group("/assessment-migrations")
+		migrationRoutes.Use(handlers.PermissionMiddleware("system:edit"))
+		{
+			migrationRoutes.POST("/dry-run", handlers.DryRunAssessmentMigration)
+			migrationRoutes.POST("/:batchId/apply", handlers.ApplyAssessmentMigration)
+			migrationRoutes.GET("/:batchId", handlers.GetAssessmentMigration)
+		}
+
+		responsibilityRoutes := protected.Group("/evaluation-responsibilities")
+		{
+			responsibilityRoutes.GET("", handlers.PermissionMiddleware("responsibility:view"), handlers.GetEvaluationResponsibilities)
+			responsibilityRoutes.POST("", handlers.PermissionMiddleware("responsibility:create"), handlers.CreateEvaluationResponsibility)
+			responsibilityRoutes.PUT("/:id", handlers.PermissionMiddleware("responsibility:edit"), handlers.UpdateEvaluationResponsibility)
+			responsibilityRoutes.DELETE("/:id", handlers.PermissionMiddleware("responsibility:deactivate"), handlers.DeactivateEvaluationResponsibility)
+		}
+
 		evaluationRoutes := protected.Group("/evaluations")
 		{
 			evaluationRoutes.GET("", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluations)
 			evaluationRoutes.POST("", handlers.PermissionMiddleware("assessment:create"), handlers.CreateEvaluation)
 			evaluationRoutes.GET("/:id", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluation)
+			evaluationRoutes.GET("/:id/scoring-tasks", handlers.PermissionAnyMiddleware("assessment:view", "review:view", "assessment:approve"), handlers.GetEvaluationScoringTasks)
+			evaluationRoutes.GET("/:id/result", handlers.PermissionAnyMiddleware("assessment:view", "review:view", "assessment:approve"), handlers.GetEvaluationCanonicalResult)
+			// Self-service summary and online confirmation are ownership-checked
+			// inside the handlers. Functional roles such as PM/CTO/product
+			// manager must not lose the ability to be assessed because their RBAC
+			// role is optimized for scoring rather than self-service.
+			evaluationRoutes.POST("/:id/work-summary", handlers.SubmitEvaluationWorkSummary)
+			evaluationRoutes.POST("/:id/workflow/advance", handlers.PermissionAnyMiddleware("assessment:submit", "assessment:review", "assessment:approve"), handlers.AdvanceEvaluationWorkflow)
 			evaluationRoutes.PUT("/:id", handlers.PermissionAnyMiddleware("assessment:edit", "assessment:submit", "assessment:review", "assessment:approve"), handlers.UpdateEvaluation)
 			evaluationRoutes.DELETE("/:id", handlers.PermissionMiddleware("assessment:delete"), handlers.DeleteEvaluation)
 			evaluationRoutes.GET("/employee/:employeeId", handlers.PermissionMiddleware("assessment:view"), handlers.GetEmployeeEvaluations)
@@ -151,9 +198,20 @@ func SetupRoutes(r *gin.RouterGroup) {
 
 			// 最终结果确认与纸质签字归档
 			evaluationRoutes.GET("/:id/confirmation", handlers.PermissionMiddleware("assessment:view"), handlers.GetEvaluationConfirmation)
-			evaluationRoutes.POST("/:id/confirm-online", handlers.PermissionMiddleware("assessment:submit"), handlers.ConfirmEvaluationOnline)
+			evaluationRoutes.POST("/:id/confirm-online", handlers.ConfirmEvaluationOnline)
 			evaluationRoutes.POST("/:id/confirm-paper", handlers.PermissionMiddleware("assessment:approve"), handlers.ConfirmEvaluationPaper)
 			evaluationRoutes.GET("/:id/confirmation/attachment", handlers.PermissionMiddleware("assessment:view"), handlers.DownloadConfirmationAttachment)
+			evaluationRoutes.POST("/:id/confirmation/supplements", handlers.PermissionMiddleware("assessment:approve"), handlers.UploadConfirmationSupplement)
+			evaluationRoutes.GET("/:id/confirmation/supplements", handlers.PermissionMiddleware("assessment:view"), handlers.ListConfirmationSupplements)
+			evaluationRoutes.GET("/:id/confirmation/supplements/:supplement_id/attachment", handlers.PermissionMiddleware("assessment:view"), handlers.DownloadConfirmationSupplement)
+		}
+
+		// 新流程按指标分配的评分任务。任务归属校验在处理器内执行，
+		// 通用 review:view 权限不会自动获得未分配指标的写权限。
+		scoringTaskRoutes := protected.Group("/scoring-tasks")
+		{
+			scoringTaskRoutes.PUT("/:id", handlers.PermissionAnyMiddleware("assessment:submit", "review:submit", "assessment:approve"), handlers.UpdateScoringTask)
+			scoringTaskRoutes.POST("/:id/submit", handlers.PermissionAnyMiddleware("assessment:submit", "review:submit", "assessment:approve"), handlers.SubmitScoringTask)
 		}
 
 		// 邀请评分管理
@@ -196,6 +254,7 @@ func SetupRoutes(r *gin.RouterGroup) {
 			statsRoutes.GET("/employee/:id", handlers.PermissionAnyMiddleware("report:personal", "report:department", "report:company"), handlers.GetEmployeeStats)
 			statsRoutes.GET("/trends", handlers.PermissionMiddleware("report:company"), handlers.GetTrends)
 			statsRoutes.GET("/data", handlers.PermissionMiddleware("report:company"), handlers.GetStatisticsData)
+			statsRoutes.GET("/performance-summary", handlers.PermissionAnyMiddleware("report:personal", "report:department", "report:company"), handlers.GetPerformanceSummary)
 			statsRoutes.GET("/signoffs", handlers.PermissionMiddleware("report:export"), handlers.GetSignoffStatistics)
 		}
 
