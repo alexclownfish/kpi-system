@@ -63,3 +63,10 @@
 - [x] T028 对 FR-007/US3-AC1 的部门层级执行身份迁移前后无父级循环校验，并增加自引用及双部门成环反例；发现循环须在提交前失败，不以仅存在外键目标视为组织层级可用（partial）。
 
 **本次范围验证证据（2026-10-23）**：Dockerfile 的全部 Go 测试通过；隔离 PostgreSQL 16 的 full 与 identity 模式回归通过。身份模式复制九表，确认非九表无旧记录、密码哈希及 `access_customized` 保持、序列正确；拒绝非空目标、缺有效超管、孤儿部门与父级循环；忽略并报告非迁移历史表的孤儿。身份库首次启动后，旧密码登录管理员和普通员工，验证 ALL/SELF、角色接口 200/403，启动前后角色权限与数据范围摘要一致。完整运行镜像迁移演练先已通过；新增登录/层级反例采用 `KPI_TEST_IMAGE_TARGET=builder`（显式运行相同 Go 二进制）避开 Chromium 包镜像下载故障，不作为 PDF 或前端验收。T024–T027 仍待真实生产操作，未提前放行。
+
+## Phase 9: 服务器构建失败回归（2026-10-26）
+
+- [x] T029 [US2] 修复 server/handlers/confirmation_test.go 的补签并发测试夹具：每次使用独立、可等待写锁的磁盘 SQLite，关闭连接；失败时也收齐全部并发请求后再结束，防止遗留 goroutine 访问下一测试的全局数据库。验收：原测试重复运行、全部补签测试及 go test ./... 通过；Dockerfile.backend 保留测试门禁（FR-002/FR-006、Constitution IV）。
+- [ ] T030 [US2] 在隔离环境构建 Dockerfile.backend，更新 specs/014-postgres-production-deployment/ 的构建复测与服务器恢复步骤；保持真实九表迁移和上线验收未完成（T025–T027），不清理数据卷或跳过测试。
+
+**T029 回归证据（2026-10-26）**：原始测试 `-count=30` 复现 `database table is locked` 与 500；修复后八请求同时上传重复 50 次通过，逐一核对附件/记录/审计和 completed 状态；`go test -race` 重复 20 次通过；`go test ./...` 全部通过。完整 Dockerfile.backend 再次执行的全部 Go 测试亦通过，两个服务二进制编译通过；最终运行层下载 Chromium 依赖过慢（临时构建容器约 20 分钟，仅下载到 chromium-common 的 20MB/36.9MB），停止此次本机打包，**没有宣称完整运行镜像构建通过**，T030 保持待服务器重建验证。未改 Dockerfile 或关闭测试。源库实际来自 Mac，用户已报告服务器快照摘要一致；未取得完整归档恢复或真实迁移证据，T024–T027 保持未完成。

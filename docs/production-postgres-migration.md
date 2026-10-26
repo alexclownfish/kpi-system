@@ -6,6 +6,8 @@
 
 ## 0. 发布与旧环境预检
 
+**本次实际源库补充（2026-10-26）**：旧 SQLite 来自用户本地 Mac 的 Docker backend，不在目标 Ubuntu 服务器。用户已将本地停止写入后生成的独立快照传至 `/mnt/datadisk0/project/kpiSystem/migration-archive/20261026-160647/kpi.sqlite.snapshot`，并确认源端/目标端 SHA-256 一致。以下旧线上路径只适用于旧服务确实在服务器上的情况，不应在本次目标服务器重新查找或创建旧库。附件复制/引用核验及旧档案恢复未全部取证，不能仅凭数据库摘要将 T024 勾为完成。
+
 一次性迁移程序的 `--scope identity`、相关测试和本手册必须先经测试、提交并推送到 Git；服务器不会得到开发机尚未推送的改动。记录并锁定包含身份模式的发布 commit；确认 SSH 可读 `git@github.com:alexclownfish/kpi-system.git`。现有 PostgreSQL 容器已健康，不要为此重复初始化或删除它的卷。
 
 示例旧路径仅来自此前部署记录，必须按实际服务器核实，不要直接假定它仍在使用：
@@ -213,3 +215,18 @@
 ## 6. 回退
 
 切流前失败：保持旧 SQLite 全库和签字附件卷原样，排查目标 PG；不要删除旧卷。切流后若验证失败，先冻结新服务写入并记录新库备份，再把外部网关指回旧上游、启动旧 backend；旧库仍有旧考核、模板、签字历史，新库只迁了九表且可能已产生新写入，两边内容有意不同。切换后在新库发生的写入**不会自动回流**，须先确认差异并制定人工处理计划。不可执行 `docker compose down -v` 或删除旧数据库、旧签字卷。轮换 JWT 后的旧会话已失效，回退时亦需用户重新登录。
+
+## 7. 构建阶段并发补签测试失败的恢复
+
+2026-10-26 服务器后端镜像构建在 `RUN go test ./...` 的 `TestSignoffSupplementConcurrentAppendKeepsEachAttachment` 出现 `database table is locked`。这是测试夹具共享缓存内存 SQLite 的锁冲突；不是生产 PostgreSQL 缺表，也不是已上传的快照损坏。夹具已改成独立临时磁盘库并关闭连接，且并发测试无论成功失败都等待全部响应，避免后台请求污染后续测试。Dockerfile 的测试步骤保留。
+
+按顺序更新源码、设置同一部署上下文并重建即可；不要重新复制 `.env`、重新导出快照或删除 PG 卷：
+
+    git -C /mnt/datadisk0/project/kpiSystem/ci-build/source pull --ff-only
+    ROOT=/mnt/datadisk0/project/kpiSystem
+    SNAP="$ROOT/migration-archive/20261026-160647"
+    export KPI_SOURCE_DIR="$ROOT/ci-build/source"
+    dc() { docker compose --project-directory "$ROOT" --env-file "$ROOT/.env" -f "$ROOT/docker-compose.yml" -f "$ROOT/docker-compose.postgres.yml" "$@"; }
+    dc config --quiet && dc build backend
+
+构建通过后从第 3 节的 `dc run --rm --no-deps backend /app/kpi-server init-schema` 接着执行身份迁移；该命令仅创建结构。若此前迁移曾成功提交，必须先核实报告，不能将迁移命令重复作用于非空目标。失败构建本身不代表 schema/迁移已执行，不能据此创建放行标记。

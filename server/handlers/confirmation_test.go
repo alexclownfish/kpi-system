@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -46,11 +47,27 @@ func newPaperConfirmationRequest(t *testing.T, evaluationID uint) *http.Request 
 
 func setupConfirmationDB(t *testing.T) {
 	t.Helper()
-	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("file:confirmation-test-%s?mode=memory&cache=shared&_busy_timeout=5000", t.Name())), &gorm.Config{})
+	// Shared-cache in-memory SQLite returns SQLITE_LOCKED immediately on
+	// concurrent writes; busy_timeout cannot wait for those table locks.
+	// A private disk database exercises real concurrent requests with WAL
+	// readers and waitable writer contention instead of an artificial lock.
+	dsn := filepath.Join(t.TempDir(), "confirmation.db") + "?_journal_mode=WAL&_busy_timeout=5000"
+	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		t.Fatal(err)
+	}
+	previousDB := models.DB
 	models.DB = db
+	t.Cleanup(func() {
+		models.DB = previousDB
+		if err := sqlDB.Close(); err != nil {
+			t.Errorf("close confirmation database: %v", err)
+		}
+	})
 	if err := db.AutoMigrate(
 		&models.Role{}, &models.Permission{}, &models.UserRole{}, &models.RolePermission{},
 		&models.DataScope{}, &models.RoleDataScope{}, &models.AuditLog{}, &models.Department{},
@@ -604,34 +621,70 @@ func TestSignoffSupplementConcurrentAppendKeepsEachAttachment(t *testing.T) {
 	_, handler, evaluation, uploadDir := seedCompletedWithConfirmation(t)
 	r := gin.New()
 	r.POST("/evaluations/:id/confirmation/supplements", func(c *gin.Context) { c.Set("user_id", handler.ID) }, UploadConfirmationSupplement)
-	type result struct{ code int }
-	results := make(chan result, 2)
-	for i := 0; i < 2; i++ {
-		go func(index int) {
-			response := httptest.NewRecorder()
-			request := newSupplementRequestOptions(t, evaluation.ID, fmt.Sprintf("concurrent-%d.png", index), []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}, "2026-09-18", "")
-			r.ServeHTTP(response, request)
-			results <- result{code: response.Code}
-		}(i)
+	const uploads = 8
+	type result struct {
+		code int
+		body string
 	}
-	for i := 0; i < 2; i++ {
+	results := make(chan result, uploads)
+	start := make(chan struct{})
+	requests := make([]*http.Request, uploads)
+	for i := 0; i < uploads; i++ {
+		// Build requests on the test goroutine so construction errors cannot
+		// call Fatal inside a worker and leave the result collector waiting.
+		requests[i] = newSupplementRequestOptions(t, evaluation.ID, fmt.Sprintf("concurrent-%d.png", i), []byte{0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a}, "2026-09-18", "")
+	}
+	for _, request := range requests {
+		go func(request *http.Request) {
+			<-start
+			response := httptest.NewRecorder()
+			r.ServeHTTP(response, request)
+			results <- result{code: response.Code, body: response.Body.String()}
+		}(request)
+	}
+	close(start)
+	// Even on failure, join every request before the fixture/global DB can
+	// be replaced by the next test. Fatal on the first response leaks workers.
+	for i := 0; i < uploads; i++ {
 		if current := <-results; current.code != http.StatusOK {
-			t.Fatalf("concurrent upload status=%d", current.code)
+			t.Errorf("concurrent upload status=%d body=%s", current.code, current.body)
 		}
 	}
 	var count int64
 	if err := models.DB.Model(&models.EvaluationSignoffSupplement{}).Where("evaluation_id = ?", evaluation.ID).Count(&count).Error; err != nil {
 		t.Fatal(err)
 	}
-	if count != 2 {
-		t.Fatalf("concurrent uploads count=%d, want 2", count)
+	if count != uploads {
+		t.Fatalf("concurrent uploads count=%d, want %d", count, uploads)
 	}
 	entries, err := os.ReadDir(uploadDir)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(entries) != 2 {
-		t.Fatalf("stored attachments=%d, want 2", len(entries))
+	if len(entries) != uploads {
+		t.Fatalf("stored attachments=%d, want %d", len(entries), uploads)
+	}
+	var supplements []models.EvaluationSignoffSupplement
+	if err := models.DB.Where("evaluation_id = ?", evaluation.ID).Find(&supplements).Error; err != nil {
+		t.Fatal(err)
+	}
+	for _, supplement := range supplements {
+		content, err := os.ReadFile(filepath.Join(uploadDir, supplement.AttachmentStoredName))
+		if err != nil || int64(len(content)) != supplement.AttachmentSize {
+			t.Fatalf("attachment %s missing or damaged: %v", supplement.AttachmentOriginalName, err)
+		}
+	}
+	if err := models.DB.Model(&models.AuditLog{}).Where("action = ? AND resource_id = ? AND result = ?", "upload_signoff_supplement", fmt.Sprint(evaluation.ID), "SUCCESS").Count(&count).Error; err != nil {
+		t.Fatal(err)
+	}
+	if count != uploads {
+		t.Fatalf("supplement audits=%d, want %d", count, uploads)
+	}
+	if err := models.DB.First(&evaluation, evaluation.ID).Error; err != nil {
+		t.Fatal(err)
+	}
+	if evaluation.Status != "completed" {
+		t.Fatalf("supplement upload changed completed state to %q", evaluation.Status)
 	}
 }
 
