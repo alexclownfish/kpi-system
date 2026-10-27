@@ -186,6 +186,8 @@
 
 新 Compose 默认只在目标宿主机 127.0.0.1:8088 暴露统一 Nginx。若现有外部 API Gateway 与目标宿主机不是同一网络命名空间，不能继续使用原来的 172.16.230.14:13808（后端）和 :13003（前端）上游。应将 ROOT/.env 的 KPI_HTTP_BIND 改为目标宿主机**实际私网 IP**（如核实后仍是 172.16.230.14），然后再次运行 "$ROOT/ci-build/source/scripts/deploy-production.sh" --postgres --skip-pull，使运行中的网关以已发布镜像重建并检查该私网 IP:8088 的健康状态。将外部 Nginx 的 /api/、/health、/ 统一代理到该私网 IP:8088；只允许网关来源访问该端口。先 nginx -t，再平滑 reload。若网关直接运行于同一宿主机，可保留 127.0.0.1:8088。域名、TLS、CORS 来源必须一致。
 
+内部 Docker Nginx 位于 TLS 终止网关之后时，`/api/` 和 SSE 代理必须原样转发外部网关的 `X-Forwarded-Proto`，不能用内部 HTTP 连接的 `$scheme` 覆盖它；否则后端生成的导出下载地址会错误地变成 `http://`，浏览器会遇到 HTTPS 网关的 502 或混合内容问题。`nginx/conf.d/kpi.conf` 已按此规则配置；更新后需要重建 `nginx-gateway` 镜像并执行 `nginx -t`。
+
 在另一维护窗口冻结新后端写入，备份当前 PG 与**新**签字卷（可能为空）；这些备份不同于第 1 节封存的**旧** SQLite 与历史签字档案，两套均需离机保存。PG 归档不要落在唯一的数据盘上。下面的密码只在容器内部读取，命令行和输出均不显示明文：
 
     BACKUP=/mnt/datadisk0/project/kpiSystem/verified-backup/$(date -u +%Y%m%d-%H%M%S)

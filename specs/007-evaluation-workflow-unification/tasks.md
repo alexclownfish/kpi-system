@@ -407,3 +407,9 @@ are rejected. Repeat with an invalid file and confirm no row/file residue.
 - [X] T124 [US8] Align supplement upload/list/download responses with the common request-ID/error envelope (while preserving the legacy `data`, `evaluation.status`, and file-stream behavior; successful downloads echo `X-Request-ID`) and add contract regressions for request IDs and stable error codes, per FR-016/FR-021 (Go suite pending environment verification).
 
 **Dependencies**: T116 → T117 → T119/T120 → T121/T122/T124 → T123. T121/T122/T124 may run in parallel; T123 depends on a built service and available browser credentials.
+
+## Phase 20: Convergence — HTTPS export download URLs
+
+- [X] T125 [US5] Preserve the outer TLS protocol through the internal Docker Nginx `/api/` and SSE proxy so backend-generated PDF/Excel download URLs retain `https://` behind an HTTPS gateway; validate the Nginx image configuration with `nginx -t` and document the required rebuild/reload in the production migration guide.
+
+**Evidence (2026-10-27)**: `nginx/conf.d/kpi.conf` forwards `$http_x_forwarded_proto` for API/SSE traffic and falls back to HTTP when accessed directly. The built test image passed `nginx -t` with service host aliases. Production must rebuild the `nginx-gateway` image before page verification.
