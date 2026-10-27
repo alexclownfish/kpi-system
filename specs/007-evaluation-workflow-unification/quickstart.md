@@ -140,6 +140,8 @@ creation-time layout. A rejected save must display text without a white page.
 4. Confirm the page shows the stable error code, request ID, and actionable retry/filter guidance instead of a silent failure.
 5. Trigger a render/storage failure in an isolated test environment and confirm the response marks it retryable and includes the result version when one exists.
 6. For batch sign-off export, confirm the response includes one result/checksum entry per PDF in the archive.
+7. When using an outer TLS gateway, verify it sends `Host $http_host` and `X-Forwarded-Proto $scheme`; rebuild the internal `nginx-gateway` after updating its image configuration. From `https://kpi.auracor.net:18182`, regenerate PDF and Excel exports and verify each new download URL retains that exact origin and downloads successfully. Direct local HTTP exports must retain their local HTTP origin. Existing download links expire after five minutes.
+8. Run `python3 tests/nginx-forwarded-origin.py` for isolated Docker Nginx regression (no application database, no published ports). It covers API/SSE/health/frontend proxy paths for HTTPS with/without a port, direct HTTP, and invalid forwarded protocols. Production file content/download acceptance is separate from this proxy test.
 
 ## 12. End-to-end regression
 

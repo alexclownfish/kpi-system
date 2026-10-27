@@ -408,8 +408,12 @@ are rejected. Repeat with an invalid file and confirm no row/file residue.
 
 **Dependencies**: T116 → T117 → T119/T120 → T121/T122/T124 → T123. T121/T122/T124 may run in parallel; T123 depends on a built service and available browser credentials.
 
-## Phase 20: Convergence — HTTPS export download URLs
+## Phase 21: Convergence — HTTPS export download URLs
 
 - [X] T125 [US5] Preserve the outer TLS protocol through the internal Docker Nginx `/api/` and SSE proxy so backend-generated PDF/Excel download URLs retain `https://` behind an HTTPS gateway; validate the Nginx image configuration with `nginx -t` and document the required rebuild/reload in the production migration guide.
 
 **Evidence (2026-10-27)**: `nginx/conf.d/kpi.conf` forwards `$http_x_forwarded_proto` for API/SSE traffic and falls back to HTTP when accessed directly. The built test image passed `nginx -t` with service host aliases. Production must rebuild the `nginx-gateway` image before page verification.
+
+- [X] T126 [US5] Extend T125 with the public `:18182` origin requirement (US5/AC4), protocol fallback/validation on API/SSE/health/frontend paths, a real Docker Nginx proxy regression in `tests/nginx-forwarded-origin.py`, and outer-gateway `$http_host` plus explicit Compose rebuild instructions in `quickstart.md` and `docs/production-postgres-migration.md`. Confirm the original config fails the regression and the fixed config passes; production PDF download remains pending user validation.
+
+**T126 evidence (2026-10-27)**: Original `afb4c92` Nginx configuration reproduced `http://kpi.auracor.net:18182/...` for an HTTPS API request. The fixed configuration passed all 20 actual proxy checks (four paths × five origin cases) in an isolated Nginx container. T125's initial raw-header forwarding is superseded by the validated map and direct-protocol fallback. Analyze: US5/AC4 → T126 has full scoped coverage, no constitution conflict; Converge: no remaining local proxy gap, but external gateway edits and real production PDF/Excel downloads are explicitly unverified. No business database was accessed by this test.

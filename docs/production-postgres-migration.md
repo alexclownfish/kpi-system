@@ -186,7 +186,19 @@
 
 新 Compose 默认只在目标宿主机 127.0.0.1:8088 暴露统一 Nginx。若现有外部 API Gateway 与目标宿主机不是同一网络命名空间，不能继续使用原来的 172.16.230.14:13808（后端）和 :13003（前端）上游。应将 ROOT/.env 的 KPI_HTTP_BIND 改为目标宿主机**实际私网 IP**（如核实后仍是 172.16.230.14），然后再次运行 "$ROOT/ci-build/source/scripts/deploy-production.sh" --postgres --skip-pull，使运行中的网关以已发布镜像重建并检查该私网 IP:8088 的健康状态。将外部 Nginx 的 /api/、/health、/ 统一代理到该私网 IP:8088；只允许网关来源访问该端口。先 nginx -t，再平滑 reload。若网关直接运行于同一宿主机，可保留 127.0.0.1:8088。域名、TLS、CORS 来源必须一致。
 
-内部 Docker Nginx 位于 TLS 终止网关之后时，`/api/` 和 SSE 代理必须原样转发外部网关的 `X-Forwarded-Proto`，不能用内部 HTTP 连接的 `$scheme` 覆盖它；否则后端生成的导出下载地址会错误地变成 `http://`，浏览器会遇到 HTTPS 网关的 502 或混合内容问题。`nginx/conf.d/kpi.conf` 已按此规则配置；更新后需要重建 `nginx-gateway` 镜像并执行 `nginx -t`。
+内部 Docker Nginx 位于 TLS 终止网关之后时，代理必须保留外部网关的 `X-Forwarded-Proto`，不能用内部 HTTP 连接的 `$scheme` 覆盖它；否则后端生成的导出下载地址会错误地变成 `http://`，请求会进入错误的协议入口。`nginx/conf.d/kpi.conf` 使用 map 仅接受 http/https，未提供或非法时回退到内部连接协议；API、SSE、health 和前端路径均保留 Host 中的端口。502 的具体来源仍须结合响应和网关日志判断，不能仅凭状态码断定上游端口有误。
+
+外部 TLS 网关的每个代理 location 使用 `proxy_set_header Host $http_host;`（不要使用会丢失 `:18182` 的 `$host`）和 `proxy_set_header X-Forwarded-Proto $scheme;`。外部网关负责覆盖客户端传入的协议头；内部 8088 仅允许该网关来源访问。修改外部宿主机挂载的配置文件后，在**外部网关容器**执行 `nginx -t` 和 `nginx -s reload`；在容器里不能将宿主机 `127.0.0.1:8088` 当作其它容器/宿主机入口。
+
+在源码目录拉取已发布修复后，仅构建并重建项目内部网关，保留后端、PG 和所有数据卷：
+
+    export KPI_SOURCE_DIR="$ROOT/ci-build/source"
+    dc build nginx-gateway
+    dc up -d --no-deps --force-recreate --no-build nginx-gateway
+    dc exec -T nginx-gateway nginx -t
+    curl -f http://127.0.0.1:8088/health
+
+若 8088 仅绑定指定私网 IP，上述 curl 使用该绑定 IP。重新从实际页面生成 PDF 和 Excel，确认 `file_url` 与浏览器使用相同的协议、域名和端口；例如页面在 `https://kpi.auracor.net:18182` 时，链接必须包含 `https://kpi.auracor.net:18182/api/download/exports/…`。旧下载键只有五分钟有效期，不用旧链接代替回归。隔离代理自动化验证：`python3 tests/nginx-forwarded-origin.py`，不连接业务数据库或发布测试端口。
 
 在另一维护窗口冻结新后端写入，备份当前 PG 与**新**签字卷（可能为空）；这些备份不同于第 1 节封存的**旧** SQLite 与历史签字档案，两套均需离机保存。PG 归档不要落在唯一的数据盘上。下面的密码只在容器内部读取，命令行和输出均不显示明文：
 

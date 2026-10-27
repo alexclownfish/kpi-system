@@ -105,6 +105,7 @@ As an HR administrator, I want historical assessments and all export formats to 
 1. **Given** a completed assessment with a template snapshot, **When** the current template is renamed or its weights are changed, **Then** the historical assessment result and export content remain unchanged.
 2. **Given** an export layout selected in the template, **When** Excel and PDF exports are generated, **Then** both contain the same selected fields and the configured print orientation.
 3. **Given** an export or calculation error, **When** the request fails, **Then** the page displays an actionable error and no partial download is presented as successful.
+4. **Given** a browser accesses the application through an HTTPS gateway, including a nonstandard public port, **When** PDF or Excel export returns a download link, **Then** the link retains the browser's public protocol, hostname, and port; direct local HTTP access remains usable.
 
 ### User Story 6 - Separate RBAC From Evaluation Responsibilities (Priority: P2)
 

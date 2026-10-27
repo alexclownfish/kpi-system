@@ -4,6 +4,8 @@
 
 **Input**: Feature specification from `/specs/007-evaluation-workflow-unification/spec.md`
 
+**Production export-origin correction (2026-10-27)**: API/SSE/health/frontend proxy paths in `nginx/conf.d/kpi.conf` preserve public `Host` including its port and forward canonical `http`/`https` from the outer gateway, falling back to the local scheme for direct access. The outer TLS gateway must send `Host $http_host` rather than `$host`. `tests/nginx-forwarded-origin.py` exercises actual Nginx HTTP proxying to isolated echo upstreams, including HTTPS with `:18182`, direct HTTP, and invalid forwarded protocols. No database, export content, or download-token contract changes.
+
 ## Summary
 
 This feature replaces the current split assessment flow with one backend-owned model for item-level scoring tasks, workflow transitions, weighted calculation, historical snapshots, and exports. The implementation will preserve the legacy `KPIScore`, invitation, and total fields for compatibility while making new assessment records use explicit scoring-task assignments and one canonical calculation result. Production data is handled in stages: first a read-only audit, then a dry-run migration, then an explicitly authorized migration batch.
