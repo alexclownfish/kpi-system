@@ -290,6 +290,8 @@ cd server && CGO_ENABLED=1 go run main.go  # 仅启动后端
 
 ### 生产环境部署
 
+已完成 PostgreSQL 迁移的生产环境，推荐使用[构建镜像后单文件部署](docs/production-image-deployment.md)：在构建机发布三镜像，运行机改版本后执行 `docker compose up -d`，无需再叠加 PG 配置。
+
 1. **构建前端**
 ```bash
 npm run build

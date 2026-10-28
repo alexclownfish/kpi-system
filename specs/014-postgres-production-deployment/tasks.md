@@ -2,6 +2,17 @@
 
 **Input**: spec.md、plan.md、research.md、data-model.md、contracts/migration-cli.md
 
+## 当前增量：单文件镜像部署（2026-10-27）
+
+当前真实状态：用户提供的生产查询证实 PG 内 ID=8 管理员启用且绑定 super_admin，但重建后的 backend 缺 DB_DRIVER/PGHOST/PGDATABASE，回到默认 SQLite 并启动失败。本次只解决发布/运行方式，保留旧迁移验收任务，不宣称其全部完成。
+
+- [x] T031 [US4] 先明确 FR-011/012、单文件运行设计和现有卷不变量，完成 Spec-Kit Analyze。
+- [x] T032 [US4] 新增 deploy/production/docker-compose.yml 及 docs/production-image-deployment.md，复用已有三镜像构建推送脚本，提供首次替换与日常单命令更新方法。
+- [x] T033 [US4] 自动验证单文件无构建、PG 强制配置、已有卷名/缺卷失败、三镜像构建推送；隔离启动页面/登录/健康并重建验证账号、签字/导出卷，记录结果并 Converge。
+- [ ] T034 [US4] 用户发布镜像并在生产替换运行配置，验证原账号登录、权限、PDF下载/签字材料及重建持久化；未取得生产证据保持未完成。
+
+**T031–T033 证据（2026-10-27）**：10/10 规格检查项通过；真实 Compose 解析确认无 build、PG 参数固定、超级管理员初始化关闭、外部五卷引用和导出路径正确；模拟构建 CLI 确认默认 git pull --ff-only、三镜像同版本/amd64 构建和 push、不部署。真实隔离 PG16 + 已有 PG 后端/前端运行镜像 + 当前 Dockerfile 构建的 Nginx 通过启动、网关 /health、登录页、管理员登录；去除测试初始化凭据后重建三个应用服务，原 ID/密码登录及签字/导出测试文件保持。缺外部 PG 卷启动失败。未推送镜像到用户仓库，未替换生产配置；业务/PDF内容/权限验收仍由 T034 和既有任务覆盖，不冒充完整 Feature 验收。
+
 ## Phase 1: 基础与设计
 
 - [x] T001 [P] 明确旧库、附件、回退和无生产清库约束，写入 specs/014-postgres-production-deployment/spec.md。

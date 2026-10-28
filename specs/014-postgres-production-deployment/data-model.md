@@ -1,5 +1,7 @@
 # Data Model: 迁移边界与不变量
 
+**镜像运行增量（2026-10-27）**：不改变表结构或账号。单文件生产配置明确复用 `kpi-system-pg_kpi-postgres-data`、`kpi-system-pg_kpi-db`、`kpi-system-pg_kpi-exports`、`kpi-system-pg_kpi-signoffs`、`kpi-system-pg_kpi-backups` 五卷；external 缺失则失败。导出卷挂载到程序实际写入的 `/app/public/exports`；临时文件过期规则和进程内下载令牌生命周期保持不变，重建后文件在卷中不代表旧下载链接仍有效。
+
 此次不重新设计业务表。目标 PostgreSQL schema 由当前模型完整创建；本次仅复制显式白名单中的九张表：`departments`、`job_positions`、`employees`、`roles`、`permissions`、`user_roles`、`role_permissions`、`data_scopes`、`role_data_scopes`。这九表的源字段不能静默丢弃。其余所有表仅保留新 schema 中的空结构；旧数据（模板/指标、考核/评分/确认、审计、设置、签字元数据等）只在完整 SQLite 归档中。`--scope full` 仍是可选的旧全量模式，不是本次执行路径。
 
 | 实体 | 关键不变量 | 验收 |

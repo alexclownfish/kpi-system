@@ -1,5 +1,11 @@
 # Quickstart: 迁移验收入口
 
+## 已完成迁移后的日常更新
+
+用户当前 PG 已有有效超级管理员；后端漏加载 overlay 的问题与迁移本身不同。已迁移环境用 [单文件镜像部署](../../docs/production-image-deployment.md)：构建机调用现有脚本拉代码、构建推送三镜像，运行机一次性换为 deploy/production/docker-compose.yml 并填镜像地址，之后只改三镜像版本并 `docker compose up -d`。保留原 .env、秘密文件、已核实五卷；不重复下面的身份迁移。切换与真实账号/PDF/签字验证属于 T034，未代为执行。
+
+## 首次迁移验收
+
 1. 阅读 docs/production-postgres-migration.md；核对旧服务、真实 SQLite 文件、签字卷和旧账号，在停写窗口保存一致性 SQLite 全库与签字附件快照，校验哈希并异机归档。此归档保留旧考核，**不导入**新 PG。
 2. 用户的独立 PostgreSQL 容器已显示 healthy；先核实它的 Compose 项目和目标空库，不重复创建或删除卷。若 schema 未建，使用发布源码在未启动 backend 的条件下执行 `kpi-server init-schema`；目标应有全部表结构但无业务行。
 3. 构建后端迁移镜像，对 SQLite 快照执行迁移程序，**显式指定 `--scope identity`**，其余参数为 `--source`、`--source-sha256`、`--expect-database`、`--confirm-empty-target`。逐表核对九表行数/主键/关联/序列与有效超级管理员；普通后端首启前，目标考核、模板、评分、确认、签字元数据、审计等非九表为零。任何不符即停止。
