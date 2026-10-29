@@ -89,7 +89,11 @@ func resolveTemplateScoringAssignments(db *gorm.DB, employee models.Employee, te
 				continue
 			}
 			for _, user := range users {
-				key := fmt.Sprintf("%d:%d", item.ID, user.ID)
+				// Keep separate assignments when one person carries multiple
+				// responsibilities for the same KPI item (for example CTO and
+				// DEPARTMENT_MANAGER). The responsibility label is part of the
+				// immutable workflow assignment and must not be deduplicated away.
+				key := fmt.Sprintf("%d:%s:%d", item.ID, scorerType, user.ID)
 				if _, exists := seen[key]; exists {
 					continue
 				}

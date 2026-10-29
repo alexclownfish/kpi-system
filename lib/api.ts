@@ -108,6 +108,7 @@ export interface Department {
   description: string
   parent_id?: number | null
   leader_id?: number | null
+  leader?: { id: number; name: string; position: string; is_active: boolean } | null
   created_at: string
   employees?: Employee[]
 }
@@ -845,10 +846,12 @@ export const departmentApi = {
   getPositions: (id: number): Promise<{ data: { id: number; department_id: number; name: string }[] }> => api.get(`/departments/${id}/positions`),
   getManagerCandidates: (id: number, position: string, employeeId?: number): Promise<{ data: Employee[]; message?: string }> =>
     api.get(`/departments/${id}/manager-candidates`, { params: { position, employee_id: employeeId } }),
+  getLeaderCandidates: (params?: PaginationParams & { search?: string }): Promise<PaginatedResponse<Employee>> =>
+    api.get("/departments/leader-candidates", { params }),
   getById: (id: number): Promise<{ data: Department }> => api.get(`/departments/${id}`),
   create: (data: Omit<Department, "id" | "created_at">): Promise<{ data: Department }> =>
     api.post("/departments", data),
-  update: (id: number, data: Partial<Department>): Promise<{ data: Department }> => api.put(`/departments/${id}`, data),
+  update: (id: number, data: Partial<Department>): Promise<{ data: Department; previous_leader_direct_reports?: number }> => api.put(`/departments/${id}`, data),
   delete: (id: number): Promise<void> => api.delete(`/departments/${id}`),
 }
 

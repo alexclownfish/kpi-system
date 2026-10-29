@@ -89,7 +89,7 @@ func openConfiguredDatabase() (*gorm.DB, error) {
 }
 
 func migrateSchema(db *gorm.DB) error {
-	return db.AutoMigrate(
+	if err := db.AutoMigrate(
 		&Role{},
 		&Permission{},
 		&UserRole{},
@@ -126,7 +126,27 @@ func migrateSchema(db *gorm.DB) error {
 		&InvitedScore{},
 		&SystemSetting{},
 		&PerformanceRule{},
-	)
+	); err != nil {
+		return err
+	}
+	return migrateScoringTaskDutyIndex(db)
+}
+
+// AutoMigrate creates the replacement index first. Only then remove the
+// narrower legacy index, retaining every existing task and its score.
+func migrateScoringTaskDutyIndex(db *gorm.DB) error {
+	return db.Transaction(func(tx *gorm.DB) error {
+		m := tx.Migrator()
+		if !m.HasIndex(&EvaluationScoringTask{}, "idx_evaluation_item_scorer_duty") {
+			if err := m.CreateIndex(&EvaluationScoringTask{}, "idx_evaluation_item_scorer_duty"); err != nil {
+				return err
+			}
+		}
+		if m.HasIndex(&EvaluationScoringTask{}, "idx_evaluation_item_scorer") {
+			return m.DropIndex(&EvaluationScoringTask{}, "idx_evaluation_item_scorer")
+		}
+		return nil
+	})
 }
 
 // DB_DRIVER must be explicit for PostgreSQL. Existing installations retain

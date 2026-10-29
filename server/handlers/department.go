@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -69,6 +70,11 @@ func GetDepartments(c *gin.Context) {
 		return
 	}
 
+	departmentPointers := make([]*models.Department, len(departments))
+	for i := range departments {
+		departmentPointers[i] = &departments[i]
+	}
+	hydrateDepartmentLeaders(c, departmentPointers)
 	// 计算分页信息
 	totalPages := int((total + int64(pageSize) - 1) / int64(pageSize))
 
@@ -103,14 +109,20 @@ func CreateDepartment(c *gin.Context) {
 		return
 	}
 	if request.LeaderID != nil {
-		c.JSON(400, gin.H{"error": "请先创建部门并添加员工，再设置部门负责人"})
-		return
+		if err := validateDepartmentLeader(models.DB, actorID(c), *request.LeaderID); err != nil {
+			status := http.StatusBadRequest
+			if strings.Contains(err.Error(), "数据范围") {
+				status = http.StatusForbidden
+			}
+			c.JSON(status, gin.H{"error": err.Error()})
+			return
+		}
 	}
 	if err := validateDepartmentParent(models.DB, 0, request.ParentID); err != nil {
 		c.JSON(400, gin.H{"error": err.Error()})
 		return
 	}
-	department := models.Department{Name: strings.TrimSpace(request.Name), Description: request.Description, ParentID: request.ParentID}
+	department := models.Department{Name: strings.TrimSpace(request.Name), Description: request.Description, ParentID: request.ParentID, LeaderID: request.LeaderID}
 
 	result := models.DB.Create(&department)
 	if result.Error != nil {
@@ -121,11 +133,12 @@ func CreateDepartment(c *gin.Context) {
 		return
 	}
 
+	hydrateDepartmentLeaders(c, []*models.Department{&department})
 	c.JSON(http.StatusCreated, gin.H{
 		"message": "部门创建成功",
 		"data":    department,
 	})
-	RecordAuditDetails(c, "create_department", "department", strconv.FormatUint(uint64(department.ID), 10), "SUCCESS", "parent_id="+stringParentID(department.ParentID))
+	RecordAuditDetails(c, "create_department", "department", strconv.FormatUint(uint64(department.ID), 10), "SUCCESS", "parent_id="+stringParentID(department.ParentID)+";leader_id="+stringParentID(department.LeaderID))
 }
 
 // 获取单个部门
@@ -149,6 +162,8 @@ func GetDepartment(c *gin.Context) {
 		})
 		return
 	}
+
+	hydrateDepartmentLeaders(c, []*models.Department{&department})
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": department,
@@ -176,6 +191,10 @@ func UpdateDepartment(c *gin.Context) {
 	}
 
 	var updateData map[string]json.RawMessage
+	if !departmentWithinActorScope(actorID(c), department.ID) {
+		c.JSON(http.StatusForbidden, gin.H{"error": "部门超出数据范围"})
+		return
+	}
 	if err := c.ShouldBindJSON(&updateData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error":   "请求参数错误",
@@ -213,33 +232,118 @@ func UpdateDepartment(c *gin.Context) {
 			return
 		}
 		if leaderID != nil {
-			var leader models.Employee
-			if err := models.DB.First(&leader, *leaderID).Error; err != nil || !leader.IsActive || leader.DepartmentID != department.ID {
-				c.JSON(400, gin.H{"error": "部门负责人必须是本部门在职员工"})
-				return
-			}
-			if !CanAccessEmployee(actorID(c), *leaderID) {
-				c.JSON(403, gin.H{"error": "部门负责人超出数据范围"})
+			if err := validateDepartmentLeader(models.DB, actorID(c), *leaderID); err != nil {
+				status := http.StatusBadRequest
+				if strings.Contains(err.Error(), "数据范围") {
+					status = http.StatusForbidden
+				}
+				c.JSON(status, gin.H{"error": err.Error()})
 				return
 			}
 		}
 		updates["leader_id"] = leaderID
 	}
+	oldLeaderID := department.LeaderID
+	previousLeaderDirectReports := int64(0)
+	if raw, changed := updateData["leader_id"]; changed && oldLeaderID != nil {
+		var requested *uint
+		_ = json.Unmarshal(raw, &requested)
+		if requested == nil || *requested != *oldLeaderID {
+			if err := models.DB.Model(&models.Employee{}).Where("department_id = ? AND manager_id = ? AND is_active = ?", department.ID, *oldLeaderID, true).Count(&previousLeaderDirectReports).Error; err != nil {
+				c.JSON(500, gin.H{"error": "统计负责人交接信息失败"})
+				return
+			}
+		}
+	}
 	result = models.DB.Model(&department).Updates(updates)
 	if result.Error != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error":   "更新部门失败",
-			"message": result.Error.Error(),
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "更新部门失败", "message": result.Error.Error()})
 		return
 	}
-	models.DB.First(&department, departmentId)
-	RecordAuditDetails(c, "update_department", "department", strconv.FormatUint(departmentId, 10), "SUCCESS", "parent_id="+stringParentID(department.ParentID)+";leader_id="+stringParentID(department.LeaderID))
+	department = models.Department{}
+	if err := models.DB.First(&department, departmentId).Error; err != nil {
+		c.JSON(500, gin.H{"error": "读取更新后的部门失败"})
+		return
+	}
+	hydrateDepartmentLeaders(c, []*models.Department{&department})
+	RecordAuditDetails(c, "update_department", "department", strconv.FormatUint(departmentId, 10), "SUCCESS", "parent_id="+stringParentID(department.ParentID)+";old_leader_id="+stringParentID(oldLeaderID)+";leader_id="+stringParentID(department.LeaderID)+";previous_leader_direct_reports="+strconv.FormatInt(previousLeaderDirectReports, 10))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "部门更新成功",
-		"data":    department,
+		"message":                        "部门更新成功",
+		"data":                           department,
+		"previous_leader_direct_reports": previousLeaderDirectReports,
 	})
+}
+
+func validateDepartmentLeader(db *gorm.DB, actorID, leaderID uint) error {
+	var leader models.Employee
+	if err := db.Where("id = ?", leaderID).First(&leader).Error; err != nil || !leader.IsActive {
+		return errors.New("部门负责人必须是在职员工")
+	}
+	if !CanAccessEmployee(actorID, leaderID) {
+		return errors.New("部门负责人超出数据范围")
+	}
+	return nil
+}
+
+// GetDepartmentLeaderCandidates exposes only active employees in the actor's
+// existing data scope; it never grants a new permission or scope.
+func GetDepartmentLeaderCandidates(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("pageSize", "100"))
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 100 {
+		pageSize = 100
+	}
+	query := ApplyEmployeeScope(models.DB.Model(&models.Employee{}), actorID(c)).Where("is_active = ?", true)
+	if search := strings.TrimSpace(c.Query("search")); search != "" {
+		pattern := "%" + search + "%"
+		query = query.Where("LOWER(name) LIKE LOWER(?) OR LOWER(email) LIKE LOWER(?) OR LOWER(position) LIKE LOWER(?)", pattern, pattern, pattern)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		c.JSON(500, gin.H{"error": "负责人候选统计失败"})
+		return
+	}
+	employees := []models.Employee{}
+	if err := query.Select("id", "name", "email", "position", "department_id", "is_active").Order("name ASC, id ASC").Offset((page - 1) * pageSize).Limit(pageSize).Find(&employees).Error; err != nil {
+		c.JSON(500, gin.H{"error": "负责人候选加载失败"})
+		return
+	}
+	c.JSON(200, gin.H{"data": employees, "total": total, "page": page, "pageSize": pageSize, "totalPages": (total + int64(pageSize) - 1) / int64(pageSize)})
+}
+
+func hydrateDepartmentLeaders(c *gin.Context, departments []*models.Department) {
+	actor := actorID(c)
+	if actor == 0 {
+		return
+	} // Public registration catalog has no staff details.
+	var employee models.Employee
+	_ = models.DB.Select("department_id").First(&employee, actor).Error
+	ids := []uint{}
+	for _, department := range departments {
+		if department.LeaderID != nil && (department.ID == employee.DepartmentID || departmentWithinActorScope(actor, department.ID)) {
+			ids = append(ids, *department.LeaderID)
+		}
+	}
+	if len(ids) == 0 {
+		return
+	}
+	var leaders []models.DepartmentLeaderSummary
+	if models.DB.Table("employees").Select("id", "name", "position", "is_active").Where("id IN ?", ids).Scan(&leaders).Error != nil {
+		return
+	}
+	byID := map[uint]*models.DepartmentLeaderSummary{}
+	for i := range leaders {
+		byID[leaders[i].ID] = &leaders[i]
+	}
+	for _, department := range departments {
+		if department.LeaderID != nil && (department.ID == employee.DepartmentID || departmentWithinActorScope(actor, department.ID)) {
+			department.Leader = byID[*department.LeaderID]
+		}
+	}
 }
 
 func stringParentID(id *uint) string {

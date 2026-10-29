@@ -78,7 +78,16 @@ type Department struct {
 	UpdatedAt   time.Time `json:"updated_at"`
 
 	// 关联关系
-	Employees []Employee `json:"employees,omitempty" gorm:"foreignKey:DepartmentID"`
+	Employees []Employee               `json:"employees,omitempty" gorm:"foreignKey:DepartmentID"`
+	Leader    *DepartmentLeaderSummary `json:"leader,omitempty" gorm:"-"`
+}
+
+// DepartmentLeaderSummary intentionally omits credentials and employee details.
+type DepartmentLeaderSummary struct {
+	ID       uint   `json:"id"`
+	Name     string `json:"name"`
+	Position string `json:"position"`
+	IsActive bool   `json:"is_active"`
 }
 
 // JobPosition is a department-specific business position, not an access role.
@@ -358,10 +367,10 @@ type EvaluationResponsibility struct {
 // workflow evaluations. A numeric zero is a valid score; nil means no score.
 type EvaluationScoringTask struct {
 	ID            uint       `json:"id" gorm:"primaryKey"`
-	EvaluationID  uint       `json:"evaluation_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer"`
-	ItemID        uint       `json:"item_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer"`
-	ScorerUserID  uint       `json:"scorer_user_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer"`
-	ScorerType    string     `json:"scorer_type" gorm:"size:32;not null;index"`
+	EvaluationID  uint       `json:"evaluation_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer_duty"`
+	ItemID        uint       `json:"item_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer_duty"`
+	ScorerUserID  uint       `json:"scorer_user_id" gorm:"not null;index;uniqueIndex:idx_evaluation_item_scorer_duty"`
+	ScorerType    string     `json:"scorer_type" gorm:"size:32;not null;index;uniqueIndex:idx_evaluation_item_scorer_duty"`
 	Sequence      int        `json:"sequence" gorm:"not null;default:0;index"`
 	Required      bool       `json:"required" gorm:"not null;default:true"`
 	Status        string     `json:"status" gorm:"size:24;not null;default:pending;index"`

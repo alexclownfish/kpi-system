@@ -126,9 +126,9 @@ func applyResponsibilityAdministrationScope(query *gorm.DB, actorID uint) *gorm.
 	case "ALL":
 		return query
 	case "DEPARTMENT":
-		return query.Where("department_id = (SELECT department_id FROM employees WHERE id = ?)", actorID)
+		return query.Where("department_id IN ("+models.UserManagedDepartmentSQL+")", actorID, actorID)
 	case "DEPARTMENT_TREE":
-		return query.Where("department_id IN ("+models.UserDepartmentSubtreeSQL+")", actorID)
+		return query.Where("department_id IN ("+models.UserManagedDepartmentTreeSQL+")", actorID, actorID)
 	default:
 		return query.Where("1 = 0")
 	}
@@ -152,9 +152,9 @@ func departmentWithinActorScope(actorID, departmentID uint) bool {
 	switch DataScopeForUser(actorID) {
 	case "ALL":
 	case "DEPARTMENT":
-		query = query.Where("id = (SELECT department_id FROM employees WHERE id = ?)", actorID)
+		query = query.Where("id IN ("+models.UserManagedDepartmentSQL+")", actorID, actorID)
 	case "DEPARTMENT_TREE":
-		query = query.Where("id IN ("+models.UserDepartmentSubtreeSQL+")", actorID)
+		query = query.Where("id IN ("+models.UserManagedDepartmentTreeSQL+")", actorID, actorID)
 	default:
 		return false
 	}

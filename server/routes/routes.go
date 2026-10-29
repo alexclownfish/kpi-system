@@ -87,6 +87,7 @@ func SetupRoutes(r *gin.RouterGroup) {
 		departmentRoutes := protected.Group("/departments")
 		{
 			departmentRoutes.GET("", handlers.PermissionMiddleware("department:view"), handlers.GetDepartments)
+			departmentRoutes.GET("/leader-candidates", handlers.PermissionAnyMiddleware("department:create", "department:edit"), handlers.GetDepartmentLeaderCandidates)
 			departmentRoutes.GET("/:id/positions", handlers.PermissionAnyMiddleware("department:view", "employee:create", "employee:edit"), handlers.GetDepartmentPositions)
 			departmentRoutes.GET("/:id/manager-candidates", handlers.PermissionAnyMiddleware("department:view", "employee:create", "employee:edit"), handlers.GetDepartmentManagerCandidates)
 			departmentRoutes.POST("", handlers.PermissionMiddleware("department:create"), handlers.CreateDepartment)

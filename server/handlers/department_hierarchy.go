@@ -88,7 +88,7 @@ func repairDepartmentLeaderManagers(db *gorm.DB) error {
 				continue
 			}
 			var head models.Employee
-			if err := tx.First(&head, *child.LeaderID).Error; err != nil || !head.IsActive || head.ManagerID != nil {
+			if err := tx.First(&head, *child.LeaderID).Error; err != nil || !head.IsActive || head.ManagerID != nil || head.DepartmentID != child.ID {
 				continue
 			}
 			supervisors, source, err := resolveHeadSupervisor(tx, head)
@@ -216,8 +216,8 @@ func explicitDepartmentLeader(db *gorm.DB, departmentID, excluded uint) ([]model
 		return nil, false, nil
 	}
 	var leader models.Employee
-	if err := db.First(&leader, *department.LeaderID).Error; err != nil || !leader.IsActive || leader.DepartmentID != departmentID {
-		return nil, true, fmt.Errorf("部门“%s”的负责人已失效，请重新设置本部门在职负责人", department.Name)
+	if err := db.First(&leader, *department.LeaderID).Error; err != nil || !leader.IsActive {
+		return nil, true, fmt.Errorf("部门“%s”的负责人已失效，请重新设置在职负责人", department.Name)
 	}
 	if leader.ID == excluded {
 		return nil, true, errors.New("部门负责人评分人不能为被考核者本人")
@@ -252,12 +252,20 @@ func managerAssignmentError(db *gorm.DB, employee models.Employee, managerID uin
 			return errors.New("上级链存在无效员工")
 		}
 	}
+	var department models.Department
+	if err := db.First(&department, employee.DepartmentID).Error; err != nil {
+		return errors.New("所选部门不存在")
+	}
+	if department.LeaderID != nil && *department.LeaderID == managerID {
+		return nil
+	}
 	if !isDepartmentHead(db, employee) {
 		if manager.DepartmentID != employee.DepartmentID {
-			return errors.New("直属上级不属于所选部门")
+			return errors.New("直属上级不属于所选部门，且未被任命为该部门负责人")
 		}
 		return nil
 	}
+
 	ctos, err := responsibilityUsers(activeResponsibilities(db, "CTO").Where("scope_type = 'company'"), employee.ID)
 	if err != nil {
 		return err
@@ -386,9 +394,23 @@ func GetDepartmentManagerCandidates(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "上级候选加载失败"})
 		return
 	}
+	// Reveal only the appointed leader as a candidate to authorized operators
+	// working on this department; do not expose all of the leader's department.
+	if department.LeaderID != nil {
+		var actor models.Employee
+		_ = models.DB.Select("department_id").First(&actor, actorID(c)).Error
+		if actor.DepartmentID == department.ID || departmentWithinActorScope(actorID(c), department.ID) {
+			var appointed models.Employee
+			if models.DB.First(&appointed, *department.LeaderID).Error == nil {
+				visible = append(visible, appointed)
+			}
+		}
+	}
 	candidates := []models.Employee{}
+	seen := map[uint]bool{}
 	for _, user := range visible {
-		if managerAssignmentError(models.DB, employee, user.ID) == nil {
+		if !seen[user.ID] && managerAssignmentError(models.DB, employee, user.ID) == nil {
+			seen[user.ID] = true
 			candidates = append(candidates, user)
 		}
 	}

@@ -17,6 +17,12 @@ func newEvaluationWorkflowTestDB(t *testing.T) *gorm.DB {
 	if err != nil {
 		t.Fatalf("open fixture db: %v", err)
 	}
+	migrateWorkflowFixtureDB(t, db)
+	return db
+}
+
+func migrateWorkflowFixtureDB(t *testing.T, db *gorm.DB) {
+	t.Helper()
 	if err := db.AutoMigrate(
 		&models.Role{}, &models.Permission{}, &models.UserRole{}, &models.RolePermission{},
 		&models.DataScope{}, &models.RoleDataScope{}, &models.AuditLog{},
@@ -28,7 +34,6 @@ func newEvaluationWorkflowTestDB(t *testing.T) *gorm.DB {
 	); err != nil {
 		t.Fatalf("migrate fixture db: %v", err)
 	}
-	return db
 }
 
 func createWorkflowFixtureEmployee(t *testing.T, db *gorm.DB, name, email, position string, departmentID uint) models.Employee {

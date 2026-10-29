@@ -371,11 +371,11 @@ func ApplyEmployeeScope(query *gorm.DB, userID uint) *gorm.DB {
 	case "ALL":
 		return query
 	case "DEPARTMENT":
-		return query.Where("department_id = (SELECT department_id FROM employees WHERE id = ?)", userID)
+		return query.Where("department_id IN ("+models.UserManagedDepartmentSQL+")", userID, userID)
 	case "DIRECT_SUBORDINATES":
 		return query.Where("manager_id = ?", userID)
 	case "DEPARTMENT_TREE":
-		return query.Where("department_id IN ("+models.UserDepartmentSubtreeSQL+")", userID)
+		return query.Where("department_id IN ("+models.UserManagedDepartmentTreeSQL+")", userID, userID)
 	case "ASSIGNED":
 		return query.Where("1 = 0")
 	default:
@@ -391,9 +391,9 @@ func ApplyEvaluationScope(query *gorm.DB, userID uint) *gorm.DB {
 	case "ALL":
 		return query
 	case "DEPARTMENT":
-		return query.Where("(kpi_evaluations.employee_id IN (SELECT department_members.id FROM employees department_members WHERE department_members.department_id = (SELECT department_id FROM employees WHERE id = ?)) OR "+assigned+")", userID, userID)
+		return query.Where("(kpi_evaluations.employee_id IN (SELECT department_members.id FROM employees department_members WHERE department_members.department_id IN ("+models.UserManagedDepartmentSQL+")) OR "+assigned+")", userID, userID, userID)
 	case "DEPARTMENT_TREE":
-		return query.Where("(kpi_evaluations.employee_id IN (SELECT id FROM employees WHERE department_id IN ("+models.UserDepartmentSubtreeSQL+")) OR "+assigned+")", userID, userID)
+		return query.Where("(kpi_evaluations.employee_id IN (SELECT id FROM employees WHERE department_id IN ("+models.UserManagedDepartmentTreeSQL+")) OR "+assigned+")", userID, userID, userID)
 	case "DIRECT_SUBORDINATES":
 		return query.Where("(kpi_evaluations.employee_id IN (SELECT direct_reports.id FROM employees direct_reports WHERE direct_reports.manager_id = ?) OR "+assigned+")", userID, userID)
 	case "ASSIGNED":

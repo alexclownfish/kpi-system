@@ -170,7 +170,10 @@ func TestDepartmentHierarchyMaintenanceValidation(t *testing.T) {
 	db.Create(&parent)
 	child := models.Department{Name: "子部门", ParentID: &parent.ID}
 	db.Create(&child)
+	actor := createWorkflowFixtureEmployee(t, db, "管理员", "hierarchy-validation@test", "管理", child.ID)
+	hierarchyScopeRole(t, db, actor.ID, "ALL")
 	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set("user_id", actor.ID) })
 	r.PUT("/departments/:id", UpdateDepartment)
 	r.DELETE("/departments/:id", DeleteDepartment)
 	request := func(method string, id uint, body string, want int) {

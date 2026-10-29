@@ -11,7 +11,7 @@ import (
 
 // generateEvaluationScoringTasks materializes the item-level assignments
 // captured in an assessment snapshot. It is transactional and idempotent so
-// a retry cannot create duplicate work for the same assessment/item/user.
+// a retry cannot create duplicate work for the same assessment/item/user/duty.
 func generateEvaluationScoringTasks(tx *gorm.DB, evaluation models.KPIEvaluation, snapshot parsedEvaluationSnapshot) ([]models.EvaluationScoringTask, error) {
 	assignments := snapshot.ResolvedScorers
 	if len(assignments) == 0 {
@@ -34,7 +34,7 @@ func generateEvaluationScoringTasks(tx *gorm.DB, evaluation models.KPIEvaluation
 			return nil, fmt.Errorf("评分任务引用了不存在的指标: %d", assignment.ItemID)
 		}
 		var existing models.EvaluationScoringTask
-		err := tx.Where("evaluation_id = ? AND item_id = ? AND scorer_user_id = ?", evaluation.ID, assignment.ItemID, assignment.UserID).First(&existing).Error
+		err := tx.Where("evaluation_id = ? AND item_id = ? AND scorer_user_id = ? AND scorer_type = ?", evaluation.ID, assignment.ItemID, assignment.UserID, assignment.ScorerType).First(&existing).Error
 		if err == nil {
 			continue
 		}

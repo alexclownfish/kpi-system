@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
 import { Plus, Edit, Trash2, Users, Search } from "lucide-react"
-import { departmentApi, getApiErrorMessage, type Department, type PaginatedResponse, type PaginationParams } from "@/lib/api"
+import { departmentApi, getApiErrorMessage, type Department, type Employee, type PaginatedResponse, type PaginationParams } from "@/lib/api"
 import { useAppContext } from "@/lib/app-context"
 import { Pagination, usePagination } from "@/components/pagination"
 import { LoadingInline } from "@/components/loading"
@@ -35,8 +35,12 @@ function getParentDepartmentOptions(catalog: Department[], departmentId?: number
 export default function DepartmentsPage() {
   const { Confirm } = useAppContext()
   const { hasPermission } = useAuth()
+  const canChooseLeader = hasPermission("department:create") || hasPermission("department:edit")
   const [departments, setDepartments] = useState<Department[]>([])
   const [catalog, setCatalog] = useState<Department[]>([])
+  const [leaderCandidates, setLeaderCandidates] = useState<Employee[]>([])
+  const [leadersLoading, setLeadersLoading] = useState(false)
+  const [leaderError, setLeaderError] = useState("")
   const [formError, setFormError] = useState("")
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -88,6 +92,31 @@ export default function DepartmentsPage() {
     fetchDepartments()
   }, [fetchDepartments])
 
+  useEffect(() => {
+    if (!dialogOpen || !canChooseLeader) return
+    let cancelled = false
+    const loadLeaders = async () => {
+      setLeadersLoading(true)
+      setLeaderError("")
+      setLeaderCandidates([])
+      try {
+        const first = await departmentApi.getLeaderCandidates({ page: 1, pageSize: 100 })
+        const candidates = [...first.data]
+        for (let page = 2; page <= first.totalPages; page++) {
+          const next = await departmentApi.getLeaderCandidates({ page, pageSize: 100 })
+          candidates.push(...next.data)
+        }
+        if (!cancelled) setLeaderCandidates(candidates)
+      } catch (error) {
+        if (!cancelled) setLeaderError(getApiErrorMessage(error, "负责人候选加载失败，请重新打开窗口重试"))
+      } finally {
+        if (!cancelled) setLeadersLoading(false)
+      }
+    }
+    loadLeaders()
+    return () => { cancelled = true }
+  }, [dialogOpen, canChooseLeader])
+
   // 搜索处理
   const handleSearchChange = (value: string) => {
     setSearch(value)
@@ -102,12 +131,18 @@ export default function DepartmentsPage() {
     setFormError("")
     try {
       const payload = {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         parent_id: formData.parent_id === "none" ? null : Number(formData.parent_id),
-        leader_id: formData.leader_id === "none" ? null : Number(formData.leader_id),
+        leader_id: editingDepartment && formData.leader_id === (editingDepartment.leader_id?.toString() || "none")
+          ? undefined
+          : formData.leader_id === "none" ? null : Number(formData.leader_id),
       }
       if (editingDepartment) {
-        await departmentApi.update(editingDepartment.id, payload)
+        const result = await departmentApi.update(editingDepartment.id, payload)
+        if ((result.previous_leader_direct_reports || 0) > 0) {
+          toast.info(`旧负责人仍是 ${result.previous_leader_direct_reports} 名员工的直属上级，未自动改写，请在员工管理中按需交接`, { duration: 10000 })
+        }
       } else {
         await departmentApi.create(payload)
       }
@@ -212,21 +247,24 @@ export default function DepartmentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                {editingDepartment && <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2">
                   <Label htmlFor="department-leader">部门负责人</Label>
-                  <Select value={formData.leader_id} onValueChange={leader_id => setFormData({ ...formData, leader_id })}>
+                  <Select disabled={leadersLoading || !!leaderError} value={formData.leader_id} onValueChange={leader_id => setFormData({ ...formData, leader_id })}>
                     <SelectTrigger id="department-leader" className="w-full min-w-0"><SelectValue className="min-w-0 flex-1 text-left [&>div]:min-w-0 [&>div]:truncate" /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">未指定</SelectItem>
-                      {editingDepartment.leader_id && !editingDepartment.employees?.some(employee => employee.id === editingDepartment.leader_id) && (
-                        <SelectItem value={String(editingDepartment.leader_id)} disabled>已配置负责人 #{editingDepartment.leader_id}（失效或不可见）</SelectItem>
+                      {editingDepartment?.leader_id && !leaderCandidates.some(employee => employee.id === editingDepartment.leader_id) && (
+                        <SelectItem value={String(editingDepartment.leader_id)} disabled>{editingDepartment.leader?.name || `已配置负责人 #${editingDepartment.leader_id}`}（失效或不可选）</SelectItem>
                       )}
-                      {(editingDepartment.employees || []).filter(employee => employee.is_active).map(employee => (
-                        <SelectItem key={employee.id} value={String(employee.id)} className="whitespace-normal break-words">{employee.name}（{employee.position}）</SelectItem>
+                      {leaderCandidates.map(employee => (
+                        <SelectItem key={employee.id} value={String(employee.id)} className="whitespace-normal break-words">{employee.name}（{employee.position} · {catalog.find(department => department.id === employee.department_id)?.name || "未知部门"}）</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>}
+                  <p className="text-xs text-muted-foreground">可选择其他部门的在职员工兼任；不会改变其所属部门、岗位或角色权限。</p>
+                  {leadersLoading && <p className="text-xs text-muted-foreground">加载负责人候选中...</p>}
+                  {leaderError && <p role="alert" className="text-sm text-destructive">{leaderError}</p>}
+                </div>
               </form>
             </DialogBody>
             <DialogFooter className="flex-col-reverse sm:flex-row sm:justify-end gap-2 sm:space-x-2 sm:gap-0">
@@ -238,7 +276,7 @@ export default function DepartmentsPage() {
               >
                 取消
               </Button>
-              <Button type="submit" form="department-form" className="w-full sm:w-auto" disabled={saving}>
+              <Button type="submit" form="department-form" className="w-full sm:w-auto" disabled={saving || leadersLoading || !!leaderError}>
                 {saving ? "保存中..." : editingDepartment ? "更新" : "创建"}
               </Button>
             </DialogFooter>
@@ -293,7 +331,7 @@ export default function DepartmentsPage() {
                       {department.name}
                     </TableCell>
                     <TableCell>{department.parent_id ? catalog.find(parent => parent.id === department.parent_id)?.name || "未知部门" : "无上级部门"}</TableCell>
-                    <TableCell>{department.leader_id ? department.employees?.find(employee => employee.id === department.leader_id)?.name || `#${department.leader_id}（失效或不可见）` : "未指定"}</TableCell>
+                    <TableCell>{department.leader_id ? department.leader ? `${department.leader.name}${department.leader.is_active ? "" : "（已离职）"}` : `#${department.leader_id}（失效或不可见）` : "未指定"}</TableCell>
                     <TableCell>{department.description}</TableCell>
                     <TableCell>
                       <Badge variant="secondary">{department.employees?.length || 0} 人</Badge>

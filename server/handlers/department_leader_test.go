@@ -59,7 +59,10 @@ func TestDepartmentLeaderMaintenanceAndScope(t *testing.T) {
 	if id := getLeader(); id == nil || *id != leader.ID {
 		t.Fatal("omitted leader cleared")
 	}
-	update(fmt.Sprintf(`{"leader_id":%d}`, outside.ID), 400)
+	update(fmt.Sprintf(`{"leader_id":%d}`, outside.ID), 200)
+	if id := getLeader(); id == nil || *id != outside.ID {
+		t.Fatal("explicit cross-department appointment not saved")
+	}
 	db.Model(&leader).Update("is_active", false)
 	update(fmt.Sprintf(`{"leader_id":%d}`, leader.ID), 400)
 	db.Model(&leader).Update("is_active", true)
@@ -115,8 +118,8 @@ func TestExplicitParentLeaderWithoutDuplicateResponsibility(t *testing.T) {
 		t.Fatal("inactive configured leader fell back silently")
 	}
 	db.Model(&leader).Updates(map[string]any{"is_active": true, "department_id": child.ID})
-	if _, _, err = resolveHeadSupervisor(db, head); err == nil {
-		t.Fatal("moved configured leader accepted")
+	if users, _, err = resolveHeadSupervisor(db, head); err != nil || len(users) != 1 || users[0].ID != leader.ID {
+		t.Fatal("moving department must preserve explicit leader appointment")
 	}
 	db.Model(&leader).Update("department_id", parent.ID)
 	db.Model(&leader).Update("manager_id", head.ID)
